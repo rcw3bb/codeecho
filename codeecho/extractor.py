@@ -94,7 +94,9 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
 
     fragments: list[Fragment] = []
     # Pre-compute sorted list of newline byte offsets for O(log n) line lookups.
-    newline_offsets: list[int] = [i for i, b in enumerate(source_bytes) if b == ord(b"\n")]
+    newline_offsets: list[int] = [
+        i for i, b in enumerate(source_bytes) if b == ord(b"\n")
+    ]
     for ftype in _FRAGMENT_TYPES:
         query = _get_query(language_name, ftype, lang)
         if query is None:

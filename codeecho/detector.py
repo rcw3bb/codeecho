@@ -136,7 +136,12 @@ def _compare_pair(
 ) -> None:
     """Compare a single fragment pair and register a union if similarity >= threshold."""
     count_a, count_b = frag_a.token_count, frag_b.token_count
-    if count_a == 0 or count_b == 0 or count_b / count_a > _MAX_SIZE_RATIO or count_a / count_b > _MAX_SIZE_RATIO:
+    if (
+        count_a == 0
+        or count_b == 0
+        or count_b / count_a > _MAX_SIZE_RATIO
+        or count_a / count_b > _MAX_SIZE_RATIO
+    ):
         return
     score = _jaccard(frag_a.token_sequence, frag_b.token_sequence)
     if score >= threshold:
