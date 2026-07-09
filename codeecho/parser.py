@@ -15,10 +15,6 @@ from tree_sitter import Language, Parser, Tree
 
 _logger = logging.getLogger("codeecho.parser")
 
-_SUPPORTED_LANGUAGES: frozenset[str] = frozenset(
-    {"Python", "JavaScript", "TypeScript", "Java", "Gosu", "Go"}
-)
-
 
 def _build_language(
     language_name: str,

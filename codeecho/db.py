@@ -140,7 +140,7 @@ class SessionDB:
     # ------------------------------------------------------------------
 
     @property
-    def _conn_required(self) -> sqlite3.Connection:  # pylint: disable=invalid-name
+    def _connection(self) -> sqlite3.Connection:
         if self._conn is None:
             raise RuntimeError("SessionDB is not open; use it as a context manager.")
         return self._conn
@@ -149,9 +149,11 @@ class SessionDB:
     # Session management
     # ------------------------------------------------------------------
 
-    def create_session(self, session_id: str, scan_path: str, config: dict) -> None:
+    def create_session(
+        self, session_id: str, scan_path: str, config: dict[str, object]
+    ) -> None:
         """Insert a new scan session record."""
-        self._conn_required.execute(
+        self._connection.execute(
             "INSERT INTO sessions (id, created_at, scan_path, config_json) VALUES (?, ?, ?, ?)",
             (
                 session_id,
@@ -160,13 +162,11 @@ class SessionDB:
                 json.dumps(config),
             ),
         )
-        self._conn_required.commit()
 
     def delete_session(self, session_id: str) -> None:
         """Delete the session and all its fragments/groups via CASCADE."""
-        self._conn_required.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-        self._conn_required.commit()
-        _logger.info("Session %s deleted from database.", session_id)
+        self._connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        _logger.debug("Session %s deleted from database.", session_id)
 
     # ------------------------------------------------------------------
     # Fragments
@@ -174,7 +174,7 @@ class SessionDB:
 
     def insert_many_fragments(self, fragments: list[Fragment]) -> None:
         """Bulk-insert a list of fully-populated Fragment objects."""
-        self._conn_required.executemany(
+        self._connection.executemany(
             """
             INSERT INTO fragments
                 (id, session_id, file_path, language, fragment_type,
@@ -200,18 +200,17 @@ class SessionDB:
                 for f in fragments
             ],
         )
-        self._conn_required.commit()
 
     def get_fragments(self, session_id: str) -> list[Fragment]:
         """Return all fragments for a session."""
-        rows = self._conn_required.execute(
+        rows = self._connection.execute(
             "SELECT * FROM fragments WHERE session_id = ?", (session_id,)
         ).fetchall()
         return [_row_to_fragment(r) for r in rows]
 
     def get_fragment_by_id(self, fragment_id: str) -> Fragment | None:
         """Return a single Fragment by its ID, or None if not found."""
-        row = self._conn_required.execute(
+        row = self._connection.execute(
             "SELECT * FROM fragments WHERE id = ?", (fragment_id,)
         ).fetchone()
         return _row_to_fragment(row) if row else None
@@ -221,14 +220,14 @@ class SessionDB:
         if not fragment_ids:
             return []
         placeholders = ",".join("?" * len(fragment_ids))
-        rows = self._conn_required.execute(
+        rows = self._connection.execute(
             f"SELECT * FROM fragments WHERE id IN ({placeholders})", fragment_ids
         ).fetchall()
         return [_row_to_fragment(r) for r in rows]
 
     def count_fragments(self, session_id: str) -> int:
         """Return the number of fragments stored for a session."""
-        row = self._conn_required.execute(
+        row = self._connection.execute(
             "SELECT COUNT(*) AS cnt FROM fragments WHERE session_id = ?", (session_id,)
         ).fetchone()
         return int(row["cnt"]) if row else 0
@@ -239,7 +238,7 @@ class SessionDB:
 
     def insert_clone_group(self, group: CloneGroup) -> None:
         """Persist a CloneGroup and its member associations."""
-        self._conn_required.execute(
+        self._connection.execute(
             "INSERT INTO clone_groups (id, session_id, clone_type, representative_hash, similarity_score) "
             "VALUES (?, ?, ?, ?, ?)",
             (
@@ -250,35 +249,40 @@ class SessionDB:
                 group.similarity_score,
             ),
         )
-        self._conn_required.executemany(
+        self._connection.executemany(
             "INSERT INTO clone_group_members (group_id, fragment_id) VALUES (?, ?)",
             [(group.group_id, fid) for fid in group.member_fragment_ids],
         )
-        self._conn_required.commit()
 
     def get_clone_groups(self, session_id: str) -> list[CloneGroup]:
         """Return all clone groups with member fragment IDs for a session."""
-        rows = self._conn_required.execute(
-            "SELECT * FROM clone_groups WHERE session_id = ? ORDER BY clone_type",
+        rows = self._connection.execute(
+            """
+            SELECT cg.id, cg.session_id, cg.clone_type,
+                   cg.representative_hash, cg.similarity_score,
+                   cgm.fragment_id
+            FROM clone_groups cg
+            LEFT JOIN clone_group_members cgm ON cgm.group_id = cg.id
+            WHERE cg.session_id = ?
+            ORDER BY cg.clone_type, cg.id
+            """,
             (session_id,),
         ).fetchall()
-        groups: list[CloneGroup] = []
+        seen: dict[str, CloneGroup] = {}
         for row in rows:
-            members = self._conn_required.execute(
-                "SELECT fragment_id FROM clone_group_members WHERE group_id = ?",
-                (row["id"],),
-            ).fetchall()
-            groups.append(
-                CloneGroup(
-                    group_id=row["id"],
+            gid = row["id"]
+            if gid not in seen:
+                seen[gid] = CloneGroup(
+                    group_id=gid,
                     session_id=row["session_id"],
                     clone_type=row["clone_type"],
                     representative_hash=row["representative_hash"],
                     similarity_score=row["similarity_score"],
-                    member_fragment_ids=[m["fragment_id"] for m in members],
+                    member_fragment_ids=[],
                 )
-            )
-        return groups
+            if row["fragment_id"]:
+                seen[gid].member_fragment_ids.append(row["fragment_id"])
+        return list(seen.values())
 
     def get_fragments_for_group(self, group: CloneGroup) -> list[Fragment]:
         """Fetch Fragment objects belonging to a CloneGroup."""

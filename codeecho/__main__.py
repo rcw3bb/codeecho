@@ -4,9 +4,6 @@ CLI entry point for codeecho.
 Invoked via::
 
     poetry run python -m codeecho [OPTIONS] PATH
-
-:author: Ron Webb
-:since: 1.0.0
 """
 
 import uuid
@@ -119,12 +116,12 @@ def _parse_types(types_str: str) -> set[int]:
     metavar="PATTERN",
     help="Glob pattern(s) to exclude from scanning (repeatable).",
 )
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,invalid-name
+def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,invalid-name
     path: Path,
     types: str,
     threshold: float,
     output: str,
-    output_dir: Path,
+    output_dir: Path | None,
     db_dir: Path | None,
     fmt: str,
     min_tokens: int,
@@ -167,42 +164,70 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
 
         if not files:
             _console.print("[yellow]No supported source files found.[/yellow]")
+            session_db.delete_session(session_id)
             return
 
         # ── Phase 2: Parse → Extract → Hash ────────────────────────────────
         total_fragments = _process_files(files, session_db, session_id, min_tokens)
 
         # ── Phase 3: Clone detection ────────────────────────────────────────
-        _console.print("[dim]Detecting clones…[/dim]")
-        cnt1, cnt2, cnt3 = detect(session_db, session_id, detect_types, threshold)
+        cnt1, cnt2, cnt3 = _detect_clones(
+            session_db, session_id, detect_types, threshold
+        )
 
         result = ScanResult(
             session_id=session_id,
             scan_path=str(path.resolve()),
             files_scanned=len(files),
-            fragments_extracted=total_fragments,  # type: ignore[possibly-undefined]
+            fragments_extracted=total_fragments,
             type1_groups=cnt1,
             type2_groups=cnt2,
             type3_groups=cnt3,
         )
 
         # ── Phase 4: Report generation ──────────────────────────────────────
-        written: list[Path] = []
-        if fmt in ("json", "both"):
-            dest = json_reporter.write(
-                session_db, result, output_dir / f"{output}.json"
-            )
-            written.append(dest)
-        if fmt in ("html", "both"):
-            dest = html_reporter.write(
-                session_db, result, output_dir / f"{output}.html"
-            )
-            written.append(dest)
+        written = _write_reports(session_db, result, output_dir, output, fmt)
 
         # ── Phase 5: Clean up session ───────────────────────────────────────
         session_db.delete_session(session_id)
 
     # ── Summary table (printed after DB is closed) ──────────────────────────
+    _print_summary(result, written)
+
+
+def _detect_clones(
+    session_db: SessionDB,
+    session_id: str,
+    detect_types: set[int],
+    threshold: float,
+) -> tuple[int, int, int]:
+    """Run clone detection and return (type1_count, type2_count, type3_count)."""
+    _console.print("[dim]Detecting clones…[/dim]")
+    return detect(session_db, session_id, detect_types, threshold)
+
+
+def _write_reports(
+    session_db: SessionDB,
+    result: ScanResult,
+    output_dir: Path,
+    output: str,
+    fmt: str,
+) -> list[Path]:
+    """Write the requested report formats and return a list of written paths."""
+    written: list[Path] = []
+    if fmt in ("json", "both"):
+        written.append(
+            json_reporter.write(session_db, result, output_dir / f"{output}.json")
+        )
+    if fmt in ("html", "both"):
+        written.append(
+            html_reporter.write(session_db, result, output_dir / f"{output}.html")
+        )
+    return written
+
+
+def _print_summary(result: ScanResult, written: list[Path]) -> None:
+    """Print the scan summary table and list of saved report paths."""
     table = Table(title="Scan Summary", show_header=True, header_style="bold magenta")
     table.add_column("Metric", style="dim", min_width=26)
     table.add_column("Value", justify="right", style="bold")
@@ -216,7 +241,6 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
         "[green]Type-3[/green] clone groups (near-duplicate)", str(result.type3_groups)
     )
     _console.print(table)
-
     _console.print("\n[bold]Reports saved:[/bold]")
     for dest in written:
         _console.print(f"  [cyan]•[/cyan] {dest}")
@@ -230,7 +254,8 @@ def _process_files(
 ) -> int:
     """Parse, extract, and hash every file; bulk-insert fragments into *session_db*.
 
-    :returns: Total number of fragments extracted.
+    Returns:
+        Total number of fragments extracted.
     """
     total = 0
     with Progress(

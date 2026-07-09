@@ -35,10 +35,6 @@ min-similarity-lines=6
 
 [REFACTORING]
 
-[PYLINT]
-
-[REFACTOR]
-
 [BASIC]
 function-rgx=[a-z_][a-z0-9_]{2,30}$
 variable-naming-style=snake_case

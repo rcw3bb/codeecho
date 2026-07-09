@@ -108,7 +108,7 @@ _FALLBACK_PROFILE: NormalisationProfile = NormalisationProfile()
 # ── Regex-based tokeniser ───────────────────────────────────────────────────
 # Matches identifiers/keywords, number literals, quoted strings, and single
 # non-whitespace characters (operators, punctuation).
-_TOKEN_RE: re.Pattern = re.compile(
+_TOKEN_RE: re.Pattern[str] = re.compile(
     r'"(?:[^"\\]|\\.)*"'  # double-quoted string
     r"|'(?:[^'\\]|\\.)*'"  # single-quoted string
     r"|`(?:[^`\\]|\\.)*`"  # backtick string (JS/Go)
@@ -425,7 +425,7 @@ _KEYWORDS: dict[str, frozenset[str]] = {
 }
 
 # Patterns that indicate the token is a string/number literal
-_STRING_RE: re.Pattern = re.compile(r'^["\'\`]|^[0-9]')
+_STRING_RE: re.Pattern[str] = re.compile(r"""^["'`0-9]""")
 
 
 def get_profile(language_name: str) -> NormalisationProfile:
@@ -438,15 +438,25 @@ def _tokenise_text(text: str) -> list[str]:
     return _TOKEN_RE.findall(text)
 
 
+def _node_text(node: Node, source_bytes: bytes) -> str:
+    """Return the UTF-8 decoded source text for the byte range covered by *node*."""
+    return source_bytes[node.start_byte : node.end_byte].decode(
+        "utf-8", errors="replace"
+    )
+
+
 def tokenise_and_normalise(
     text: str, language_name: str
 ) -> tuple[list[str], list[str]]:
     """Return ``(raw_tokens, normalised_tokens)`` for a fragment source *text* string.
 
-    :param text: Raw fragment source text (UTF-8 decoded).
-    :param language_name: Language whose keyword set governs normalisation.
-    :returns: Raw token list and normalised token list where identifiers become
-              ``ID_N`` and literals become ``LIT_N``.
+    Args:
+        text: Raw fragment source text (UTF-8 decoded).
+        language_name: Language whose keyword set governs normalisation.
+
+    Returns:
+        Raw token list and normalised token list where identifiers become
+        ``ID_N`` and literals become ``LIT_N``.
     """
     raw_tokens = _tokenise_text(text)
     keywords = _KEYWORDS.get(language_name, frozenset())
@@ -458,10 +468,7 @@ def extract_tokens(node: Node, source_bytes: bytes) -> list[str]:
 
     Uses a regex-based tokeniser on the raw source slice — no tree traversal.
     """
-    text = source_bytes[node.start_byte : node.end_byte].decode(
-        "utf-8", errors="replace"
-    )
-    return _tokenise_text(text)
+    return _tokenise_text(_node_text(node, source_bytes))
 
 
 def extract_and_normalise(
@@ -469,16 +476,16 @@ def extract_and_normalise(
 ) -> tuple[list[str], list[str]]:
     """Return ``(raw_tokens, normalised_tokens)`` for the source covered by *node*.
 
-    :param node: Tree-sitter node; only its byte range is used (no child traversal).
-    :param source_bytes: Full source bytes of the file.
-    :param language_name: Language whose keyword set governs normalisation.
-    :returns: Raw token list and normalised token list where identifiers become
-              ``ID_N`` and literals become ``LIT_N``.
+    Args:
+        node: Tree-sitter node; only its byte range is used (no child traversal).
+        source_bytes: Full source bytes of the file.
+        language_name: Language whose keyword set governs normalisation.
+
+    Returns:
+        Raw token list and normalised token list where identifiers become
+        ``ID_N`` and literals become ``LIT_N``.
     """
-    text = source_bytes[node.start_byte : node.end_byte].decode(
-        "utf-8", errors="replace"
-    )
-    return tokenise_and_normalise(text, language_name)
+    return tokenise_and_normalise(_node_text(node, source_bytes), language_name)
 
 
 def _normalise(raw_tokens: list[str], keywords: frozenset[str]) -> list[str]:
@@ -508,5 +515,5 @@ def _is_identifier(token: str) -> bool:
 
 
 def _is_comment(token: str) -> bool:
-    """Return True if *token* is a single-line or multi-line comment."""
+    """Return True if *token* is a C-style single-line (``//``) or multi-line (``/* */``) comment."""
     return token.startswith("//") or (token.startswith("/*") and token.endswith("*/"))

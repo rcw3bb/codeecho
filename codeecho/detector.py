@@ -17,10 +17,12 @@ import logging
 import uuid
 from collections import defaultdict
 
-from codeecho.db import SessionDB
-from codeecho.models import CloneGroup, Fragment
+from .db import SessionDB
+from .models import CloneGroup, Fragment
 
 _logger = logging.getLogger("codeecho.detector")
+
+_MAX_SIZE_RATIO: float = 1.3
 
 
 # ── Union-Find ──────────────────────────────────────────────────────────────
@@ -102,7 +104,7 @@ def _detect_type1(
         if len(ids) >= 2:
             groups.append(_make_group(session_id, 1, ids, rep_hash=raw_hash))
             assigned.update(ids)
-    _logger.info("Type-1: %d clone groups found.", len(groups))
+    _logger.debug("Type-1: %d clone groups found.", len(groups))
     return groups, assigned
 
 
@@ -121,7 +123,7 @@ def _detect_type2(
         if len(ids) >= 2:
             groups.append(_make_group(session_id, 2, ids, rep_hash=norm_hash))
             new_assigned.update(ids)
-    _logger.info("Type-2: %d clone groups found.", len(groups))
+    _logger.debug("Type-2: %d clone groups found.", len(groups))
     return groups, new_assigned
 
 
@@ -134,7 +136,7 @@ def _compare_pair(
 ) -> None:
     """Compare a single fragment pair and register a union if similarity >= threshold."""
     count_a, count_b = frag_a.token_count, frag_b.token_count
-    if count_a == 0 or count_b / count_a > 1.3 or count_a / count_b > 1.3:
+    if count_a == 0 or count_b == 0 or count_b / count_a > _MAX_SIZE_RATIO or count_a / count_b > _MAX_SIZE_RATIO:
         return
     score = _jaccard(frag_a.token_sequence, frag_b.token_sequence)
     if score >= threshold:
@@ -149,13 +151,17 @@ def _detect_type3(
     threshold: float,
 ) -> list[CloneGroup]:
     """Pairwise Jaccard comparison for remaining fragments; clusters via union-find."""
-    candidates = [f for f in fragments if f.fragment_id not in assigned and f.token_count > 0]
+    candidates = [
+        f for f in fragments if f.fragment_id not in assigned and f.token_count > 0
+    ]
     union_find = _UnionFind()
     pair_scores: dict[tuple[str, str], float] = {}
 
     for idx_a in range(len(candidates)):  # pylint: disable=consider-using-enumerate
         for idx_b in range(idx_a + 1, len(candidates)):
-            _compare_pair(candidates[idx_a], candidates[idx_b], threshold, union_find, pair_scores)
+            _compare_pair(
+                candidates[idx_a], candidates[idx_b], threshold, union_find, pair_scores
+            )
 
     all_ids = [f.fragment_id for f in candidates]
     raw_groups = union_find.groups(all_ids)
@@ -166,7 +172,7 @@ def _detect_type3(
         sim = _group_min_similarity(member_ids, pair_scores)
         groups.append(_make_group(session_id, 3, member_ids, similarity=sim))
 
-    _logger.info("Type-3: %d clone groups found.", len(groups))
+    _logger.debug("Type-3: %d clone groups found.", len(groups))
     return groups
 
 
@@ -178,7 +184,10 @@ def _group_min_similarity(
     for idx in range(len(member_ids)):  # pylint: disable=consider-using-enumerate
         for jdx in range(idx + 1, len(member_ids)):
             pair = (member_ids[idx], member_ids[jdx])
-            if score := pair_scores.get(pair) or pair_scores.get((pair[1], pair[0])):
+            score = pair_scores.get(pair)
+            if score is None:
+                score = pair_scores.get((pair[1], pair[0]))
+            if score is not None:
                 scores.append(score)
     return min(scores) if scores else None
 
@@ -194,14 +203,17 @@ def detect(
 ) -> tuple[int, int, int]:
     """Run all requested detection passes and persist results to *db*.
 
-    :param db: Open :class:`~codeecho.db.SessionDB` context.
-    :param session_id: Current scan session UUID.
-    :param detect_types: Set of clone types to detect (any subset of ``{1, 2, 3}``).
-    :param threshold: Jaccard similarity threshold for Type-3 detection.
-    :returns: ``(type1_count, type2_count, type3_count)`` group counts.
+    Args:
+        session_db: Open :class:`~codeecho.db.SessionDB` context.
+        session_id: Current scan session UUID.
+        detect_types: Set of clone types to detect (any subset of ``{1, 2, 3}``).
+        threshold: Jaccard similarity threshold for Type-3 detection.
+
+    Returns:
+        ``(type1_count, type2_count, type3_count)`` group counts.
     """
     fragments = session_db.get_fragments(session_id)
-    _logger.info("Detecting clones in %d fragments.", len(fragments))
+    _logger.debug("Detecting clones in %d fragments.", len(fragments))
 
     assigned: set[str] = set()
     cnt1 = cnt2 = cnt3 = 0

@@ -8,7 +8,7 @@ SHA-256 fingerprinting of raw and normalised token sequences.
 import hashlib
 import logging
 
-from codeecho.models import Fragment
+from .models import Fragment
 
 _logger = logging.getLogger("codeecho.fingerprint")
 

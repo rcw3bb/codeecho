@@ -9,6 +9,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from codeecho.db import SessionDB
 from codeecho.models import CloneGroup, Fragment, ScanResult
@@ -16,7 +17,7 @@ from codeecho.models import CloneGroup, Fragment, ScanResult
 _logger = logging.getLogger("codeecho.reporter.json")
 
 
-def _fragment_to_dict(frag: Fragment) -> dict:
+def _fragment_to_dict(frag: Fragment) -> dict[str, Any]:
     return {
         "fragment_id": frag.fragment_id,
         "file": frag.file_path,
@@ -29,8 +30,8 @@ def _fragment_to_dict(frag: Fragment) -> dict:
     }
 
 
-def _group_to_dict(group: CloneGroup, members: list[Fragment]) -> dict:
-    result: dict = {
+def _group_to_dict(group: CloneGroup, members: list[Fragment]) -> dict[str, Any]:
+    result: dict[str, Any] = {
         "group_id": group.group_id,
         "clone_type": group.clone_type,
         "representative_hash": group.representative_hash,
@@ -54,7 +55,7 @@ def write(
     :returns: The resolved path of the written file.
     """
     groups = session_db.get_clone_groups(result.session_id)
-    groups_data: list[dict] = []
+    groups_data: list[dict[str, Any]] = []
     for group in groups:
         members = session_db.get_fragments_for_group(group)
         groups_data.append(_group_to_dict(group, members))
@@ -77,5 +78,5 @@ def write(
     output_path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    _logger.info("JSON report written to %s", output_path)
+    _logger.debug("JSON report written to %s", output_path)
     return output_path.resolve()

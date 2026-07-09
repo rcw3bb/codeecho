@@ -10,13 +10,14 @@ raw and normalised token sequences, source text, and line numbers.
 
 import logging
 import uuid
+from bisect import bisect_left
 from pathlib import Path
 
 from tree_sitter import Language, Query, QueryCursor, Tree
 
-from codeecho import normalizer
-from codeecho.models import Fragment
-from codeecho.parser import get_language
+from . import normalizer
+from .models import Fragment
+from .parser import get_language
 
 _logger = logging.getLogger("codeecho.extractor")
 
@@ -92,6 +93,8 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
         return []
 
     fragments: list[Fragment] = []
+    # Pre-compute sorted list of newline byte offsets for O(log n) line lookups.
+    newline_offsets: list[int] = [i for i, b in enumerate(source_bytes) if b == ord(b"\n")]
     for ftype in _FRAGMENT_TYPES:
         query = _get_query(language_name, ftype, lang)
         if query is None:
@@ -112,8 +115,8 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
             )
             if len(raw_tokens) < min_tokens:
                 continue
-            start_ln = source_bytes[:start_b].count(b"\n") + 1
-            end_ln = source_bytes[:end_b].count(b"\n") + 1
+            start_ln = bisect_left(newline_offsets, start_b) + 1
+            end_ln = bisect_left(newline_offsets, end_b) + 1
             fragments.append(
                 Fragment(
                     fragment_id=str(uuid.uuid4()),

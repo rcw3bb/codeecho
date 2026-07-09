@@ -8,7 +8,7 @@ Data models for the codeecho duplicate detection pipeline.
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(slots=True)
 class Fragment:  # pylint: disable=too-many-instance-attributes
     """Represents a code fragment (function, class, or file block) extracted from a source file."""
 
@@ -22,7 +22,7 @@ class Fragment:  # pylint: disable=too-many-instance-attributes
     token_count: int = 0
     raw_hash: str | None = None
     normalized_hash: str | None = None
-    token_sequence: list[str] = field(default_factory=list)
+    token_sequence: list[str] = field(default_factory=list, repr=False)
     normalized_tokens: list[str] = field(default_factory=list, repr=False)
     source_text: str = ""
 

@@ -2,9 +2,6 @@
 codeecho - A developer tool that scans your codebase to detect and highlight ECHOES
 of duplicated or near-duplicated code so you can refactor toward cleaner, more
 maintainable designs.
-
-:author: Ron Webb
-:since: 1.0.0
 """
 
 from env_dir_bootstrap import EnvDirBootstrap

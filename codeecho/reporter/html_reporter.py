@@ -16,7 +16,7 @@ from pathlib import Path
 from jinja2 import BaseLoader, Environment
 
 from codeecho.db import SessionDB
-from codeecho.models import CloneGroup, Fragment, ScanResult
+from codeecho.models import ScanResult
 
 _logger = logging.getLogger("codeecho.reporter.html")
 
@@ -138,7 +138,7 @@ _TEMPLATE: str = """<!DOCTYPE html>
         <strong>{{ frag.file_path }}</strong>
         lines {{ frag.start_line }}–{{ frag.end_line }}
       </div>
-      <pre>{{ frag.source_text | e }}</pre>
+      <pre>{{ frag.source_text }}</pre>
     </div>
     {% endfor %}
   </details>
@@ -196,7 +196,7 @@ def write(
     for group in groups:
         members = session_db.get_fragments_for_group(group)
         entry = {"group": group, "members": members}
-        groups_by_type.setdefault(group.clone_type, []).append(entry)
+        groups_by_type[group.clone_type].append(entry)
 
     env = Environment(loader=BaseLoader(), autoescape=True)  # type: ignore[call-arg]
     tmpl = env.from_string(_TEMPLATE)
@@ -204,11 +204,9 @@ def write(
         result=result,
         groups_by_type=groups_by_type,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        CloneGroup=CloneGroup,
-        Fragment=Fragment,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html, encoding="utf-8")
-    _logger.info("HTML report written to %s", output_path)
+    _logger.debug("HTML report written to %s", output_path)
     return output_path.resolve()

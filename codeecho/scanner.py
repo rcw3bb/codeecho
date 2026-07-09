@@ -71,7 +71,7 @@ def scan(
         if language := EXTENSION_TO_LANGUAGE.get(suffix):
             results.append((entry, language))
 
-    _logger.info("Found %d source files under %s", len(results), root)
+    _logger.debug("Found %d source files under %s", len(results), root)
     return results
 
 
@@ -79,9 +79,8 @@ def _walk(
     root: Path,
     exclude_patterns: tuple[str, ...],
     ignore_file: IgnoreFile | None,
-) -> list[Path]:
-    """Recursively yield file paths, skipping excluded directories and glob-matched files."""
-    found: list[Path] = []
+):
+    """Recursively collect file paths, skipping excluded directories and glob-matched files."""
     try:
         for child in sorted(root.iterdir()):
             if child.is_dir():
@@ -92,17 +91,16 @@ def _walk(
                 if ignore_file is not None and ignore_file.is_ignored(child):
                     _logger.debug("Ignored (ignore file): %s", child)
                     continue
-                found.extend(_walk(child, exclude_patterns, ignore_file))
+                yield from _walk(child, exclude_patterns, ignore_file)
             elif child.is_file():
                 if _matches_any(child, exclude_patterns):
                     continue
                 if ignore_file is not None and ignore_file.is_ignored(child):
                     _logger.debug("Ignored (ignore file): %s", child)
                     continue
-                found.append(child)
+                yield child
     except PermissionError as exc:
         _logger.warning("Permission denied reading %s: %s", root, exc)
-    return found
 
 
 def _matches_any(path: Path, patterns: tuple[str, ...]) -> bool:
