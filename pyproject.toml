@@ -32,6 +32,9 @@ build-backend = "poetry.core.masonry.api"
 packages = [{include = "codeecho"}]
 include = ["codeecho/logging.ini", "codeecho/.ignore", "CHANGELOG.md"]
 
+[tool.poetry.scripts]
+codeecho = "codeecho.__main__:main"
+
 [dependency-groups]
 dev = [
     "black (>=26.5.1,<27.0.0)",
