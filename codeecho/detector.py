@@ -127,6 +127,19 @@ def _detect_type2(
     return groups, new_assigned
 
 
+def _is_nested(frag_a: Fragment, frag_b: Fragment) -> bool:
+    """Return True when *frag_a* and *frag_b* are from the same file and one contains the other."""
+    if frag_a.file_path != frag_b.file_path:
+        return False
+    a_contains_b = (
+        frag_a.start_line <= frag_b.start_line and frag_a.end_line >= frag_b.end_line
+    )
+    b_contains_a = (
+        frag_b.start_line <= frag_a.start_line and frag_b.end_line >= frag_a.end_line
+    )
+    return a_contains_b or b_contains_a
+
+
 def _compare_pair(
     frag_a: Fragment,
     frag_b: Fragment,
@@ -135,6 +148,8 @@ def _compare_pair(
     pair_scores: dict[tuple[str, str], float],
 ) -> None:
     """Compare a single fragment pair and register a union if similarity >= threshold."""
+    if _is_nested(frag_a, frag_b):
+        return
     count_a, count_b = frag_a.token_count, frag_b.token_count
     if (
         count_a == 0
@@ -149,6 +164,31 @@ def _compare_pair(
         pair_scores[(frag_a.fragment_id, frag_b.fragment_id)] = score
 
 
+def _remove_nested_members(
+    member_ids: list[str], id_to_frag: dict[str, Fragment]
+) -> list[str]:
+    """Remove outer container fragments from a group that contain a nested same-file member.
+
+    When a group contains two fragments from the same file where one's line range is fully
+    contained within the other's, the outer (larger) fragment is removed — it is redundant
+    because the inner fragment is the more specific code unit.
+    """
+    to_remove: set[str] = set()
+    ids = list(member_ids)
+    for idx in range(len(ids)):  # pylint: disable=consider-using-enumerate
+        for jdx in range(idx + 1, len(ids)):
+            frag_a = id_to_frag[ids[idx]]
+            frag_b = id_to_frag[ids[jdx]]
+            if _is_nested(frag_a, frag_b):
+                size_a = frag_a.end_line - frag_a.start_line
+                size_b = frag_b.end_line - frag_b.start_line
+                # Keep the more specific (smaller) fragment; drop the outer container
+                to_remove.add(
+                    frag_a.fragment_id if size_a >= size_b else frag_b.fragment_id
+                )
+    return [fid for fid in ids if fid not in to_remove]
+
+
 def _detect_type3(
     fragments: list[Fragment],
     assigned: set[str],
@@ -159,6 +199,7 @@ def _detect_type3(
     candidates = [
         f for f in fragments if f.fragment_id not in assigned and f.token_count > 0
     ]
+    id_to_frag = {f.fragment_id: f for f in candidates}
     union_find = _UnionFind()
     pair_scores: dict[tuple[str, str], float] = {}
 
@@ -168,14 +209,15 @@ def _detect_type3(
                 candidates[idx_a], candidates[idx_b], threshold, union_find, pair_scores
             )
 
-    all_ids = [f.fragment_id for f in candidates]
-    raw_groups = union_find.groups(all_ids)
-
+    raw_groups = union_find.groups([f.fragment_id for f in candidates])
     groups: list[CloneGroup] = []
     for member_ids in raw_groups.values():
+        filtered_ids = _remove_nested_members(member_ids, id_to_frag)
+        if len(filtered_ids) < 2:
+            continue
         # Use the minimum pairwise similarity as a conservative group score
-        sim = _group_min_similarity(member_ids, pair_scores)
-        groups.append(_make_group(session_id, 3, member_ids, similarity=sim))
+        sim = _group_min_similarity(filtered_ids, pair_scores)
+        groups.append(_make_group(session_id, 3, filtered_ids, similarity=sim))
 
     _logger.debug("Type-3: %d clone groups found.", len(groups))
     return groups

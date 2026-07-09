@@ -1,6 +1,6 @@
 [project]
 name = "codeecho"
-version = "1.0.0"
+version = "1.0.1"
 description = "A developer tool that scans your codebase to detect and highlight ECHOES of duplicated or near-duplicated code so you can refactor toward cleaner, more maintainable designs."
 authors = [
     {name = "Ron Webb"}
