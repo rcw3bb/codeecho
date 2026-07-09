@@ -3,7 +3,7 @@
 > A developer tool that scans your codebase to detect and highlight **echoes** of duplicated or near-duplicated code, so you can refactor toward cleaner, more maintainable designs.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/codeecho.svg)](https://pypi.org/project/codeecho/)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
 
 ## Prerequisites
 
@@ -54,7 +54,7 @@ python -m codeecho <path> [options]
 | `--threshold <float>` | `0.8` | Jaccard similarity threshold for Type-3 detection (`0.0`–`1.0`). |
 | `--output <name>` | `codeecho-output` | Base name (without extension) for output file(s). |
 | `--output-dir <dir>` | `<cwd>/reports` | Directory where output file(s) will be written. |
-| `--db <path>` | `<temp>/codeecho.db` | Path to the SQLite scratch database used during a scan run. Session records are removed after the report is written. |
+| `--db-dir <dir>` | `~/.codeecho` | Directory for the SQLite scratch database (`codeecho.db`). Session records are removed after the report is written. |
 | `--format <fmt>` | `both` | Output format: `json`, `html`, or `both`. |
 | `--min-tokens <n>` | `10` | Minimum token count for a code fragment to be included. |
 | `--exclude <pattern>` | _(none)_ | Glob pattern(s) to exclude from scanning (repeatable). |
@@ -97,7 +97,11 @@ python -m codeecho . --exclude "*/tests/*" --exclude "*/vendor/*"
 
 | Environment variable | Description |
 |----------------------|-------------|
-| `CODEECHO_CONFIG_DIR` | Directory where `logging.ini` is seeded on first run. When unset, the bundled copy inside the package is used directly. |
+| `CODEECHO_CONFIG_DIR` | Directory where `logging.ini` and `.ignore` are seeded on first run. When unset, the bundled copies inside the package are used directly. |
+
+### `.ignore` file
+
+On first run, a `.ignore` file is seeded into `CODEECHO_CONFIG_DIR` (or the package directory when unset). It follows gitignore syntax and is applied during file scanning to exclude paths in addition to any `--exclude` patterns passed on the command line. Edit this file to permanently suppress paths you never want scanned.
 
 ## Development
 
@@ -133,19 +137,6 @@ flowchart TD
     DB --> HTML["reporter/html_reporter.py\nHTML report"]
     DB -->|delete session| Cleanup["Session cleanup"]
 ```
-
-| Module | Responsibility |
-|--------|---------------|
-| `__main__.py` | Argument parsing and pipeline orchestration |
-| `scanner.py` | Recursive file discovery; extension → language mapping |
-| `parser.py` | Tree-sitter grammar loading; one fresh parser per file |
-| `extractor.py` | Fragment extraction via Tree-sitter queries; byte-range-only node access |
-| `normalizer.py` | Regex-based token extraction; identifier/literal placeholder substitution |
-| `fingerprint.py` | SHA-256 over raw and normalised token sequences |
-| `detector.py` | Type-1/2 hash grouping; Type-3 Jaccard + union-find clustering |
-| `db.py` | `SessionDB` context manager; SQLite scratch store with cascade delete |
-| `reporter/json_reporter.py` | Reads session DB; writes structured JSON report |
-| `reporter/html_reporter.py` | Reads session DB; renders self-contained HTML report via Jinja2 |
 
 ### Format and Lint
 

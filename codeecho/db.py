@@ -12,7 +12,6 @@ after the reports have been written.
 import json
 import logging
 import sqlite3
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
@@ -21,7 +20,21 @@ from codeecho.models import CloneGroup, Fragment
 
 _logger = logging.getLogger("codeecho.db")
 
-_DEFAULT_DB_PATH: Path = Path(tempfile.gettempdir()) / "codeecho.db"
+_DB_NAME: str = "codeecho.db"
+_DEFAULT_DIR: Path = Path.home() / ".codeecho"
+
+
+def get_db_path(db_dir: str | None = None) -> str:
+    """Return the absolute path to the codeecho SQLite database file.
+
+    Uses *db_dir* when provided, otherwise falls back to ``~/.codeecho``.
+
+    :param db_dir: Optional directory that overrides the default location.
+    :return: Absolute path to the ``codeecho.db`` file.
+    """
+    directory = Path(db_dir) if db_dir else _DEFAULT_DIR
+    return str(directory.resolve() / _DB_NAME)
+
 
 _SCHEMA_SQL: str = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -92,7 +105,7 @@ class SessionDB:
     """
 
     def __init__(self, db_path: Path | None = None) -> None:
-        self._path: Path = db_path or _DEFAULT_DB_PATH
+        self._path: Path = db_path or Path(get_db_path())
         self._conn: sqlite3.Connection | None = None
 
     # ------------------------------------------------------------------

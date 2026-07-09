@@ -65,7 +65,7 @@ def test_html_report_created(session_db, session_id, tmp_path):
     assert out.exists()
     content = out.read_text(encoding="utf-8")
     assert "<!DOCTYPE html>" in content
-    assert "codeecho" in content
+    assert "CodeEcho" in content
     assert "Type-1" in content
 
 

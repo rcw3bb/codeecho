@@ -9,11 +9,11 @@ Invoked via::
 :since: 1.0.0
 """
 
-import tempfile
 import uuid
 from pathlib import Path
 
 import click
+from braincraft import IgnoreFile
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import (
@@ -25,9 +25,9 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from codeecho import __version__
+from codeecho import __version__, CONF_DIR
 from codeecho import extractor, fingerprint, parser as ts_parser, scanner
-from codeecho.db import SessionDB
+from codeecho.db import SessionDB, get_db_path
 from codeecho.detector import detect
 from codeecho.models import ScanResult
 from codeecho.reporter import html_reporter, json_reporter
@@ -91,11 +91,12 @@ def _parse_types(types_str: str) -> set[int]:
     help="Directory where output file(s) will be written.  [default: <cwd>/reports]",
 )
 @click.option(
-    "--db",
-    default=str(Path(tempfile.gettempdir()) / "codeecho.db"),
-    show_default=True,
-    type=click.Path(dir_okay=False, path_type=Path),
-    help="Path to the SQLite scratch database used during a scan run.",
+    "--db-dir",
+    "db_dir",
+    default=None,
+    show_default=False,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Directory for the SQLite scratch database.  [default: ~/.codeecho]",
 )
 @click.option(
     "--format",
@@ -124,7 +125,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
     threshold: float,
     output: str,
     output_dir: Path,
-    db: Path,
+    db_dir: Path | None,
     fmt: str,
     min_tokens: int,
     exclude: tuple[str, ...],
@@ -154,12 +155,14 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with SessionDB(db_path=db) as session_db:
+    db_path = Path(get_db_path(str(db_dir) if db_dir else None))
+    with SessionDB(db_path=db_path) as session_db:
         session_db.create_session(session_id, str(path.resolve()), config)
 
         # ── Phase 1: File discovery ─────────────────────────────────────────
         _console.print(f"[dim]Scanning:[/dim] [bold]{path.resolve()}[/bold]")
-        files = scanner.scan(path, exclude_patterns=exclude)
+        _ignore_file = IgnoreFile(Path(CONF_DIR) / ".ignore", base_dir=path.resolve())
+        files = scanner.scan(path, exclude_patterns=exclude, ignore_file=_ignore_file)
         total_fragments = 0
 
         if not files:

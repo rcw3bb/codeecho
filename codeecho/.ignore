@@ -1,0 +1,41 @@
+# .ignore — codeecho scan exclusions
+#
+# This file uses gitignore-style pattern matching. Patterns are matched
+# relative to the scan root directory (the PATH argument passed to codeecho).
+#
+# Edit this file to exclude directories or files from clone detection.
+# Uncomment or add entries below to activate them.
+#
+# --- Directory exclusion examples ---
+#
+# build/
+# dist/
+# target/
+# out/
+# generated/
+#
+# --- File extension exclusion examples ---
+#
+# *.min.js
+# *.bundle.js
+# *.generated.py
+# *.pb.go
+#
+# --- Specific file exclusion (anchored to scan root) ---
+#
+# /config/generated_config.py
+# /src/proto/generated.ts
+#
+# --- Name-based exclusion anywhere in the tree ---
+#
+# *_generated.java
+# *Test.java
+#
+# --- Double-star (match across directory boundaries) ---
+#
+# **/fixtures/
+# **/*.test.ts
+#
+# --- Negation (un-exclude even if a parent pattern matches) ---
+#
+# !important_dir/

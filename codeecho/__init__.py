@@ -14,7 +14,7 @@ __version__ = "1.0.0"
 
 _bootstrapper = EnvDirBootstrap(
     env_var="CODEECHO_CONFIG_DIR",
-    resources=["logging.ini"],
+    resources=["logging.ini", ".ignore"],
     package="codeecho",
 )
 

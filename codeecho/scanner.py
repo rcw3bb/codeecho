@@ -9,6 +9,8 @@ import fnmatch
 import logging
 from pathlib import Path
 
+from braincraft import IgnoreFile
+
 _logger = logging.getLogger("codeecho.scanner")
 
 EXTENSION_TO_LANGUAGE: dict[str, str] = {
@@ -51,18 +53,20 @@ _DEFAULT_EXCLUDE_DIRS: frozenset[str] = frozenset(
 def scan(
     root: Path,
     exclude_patterns: tuple[str, ...] = (),
+    ignore_file: IgnoreFile | None = None,
 ) -> list[tuple[Path, str]]:
     """Walk *root* recursively and return ``(path, language)`` pairs for supported files.
 
     :param root: Root directory to scan.
     :param exclude_patterns: Glob patterns (fnmatch-style) whose matching paths are skipped.
+    :param ignore_file: Optional gitignore-style :class:`~braincraft.IgnoreFile`; matched paths are skipped.
     :returns: List of ``(absolute_path, language_name)`` tuples.
     """
     results: list[tuple[Path, str]] = []
     root = root.resolve()
     _logger.debug("Scanning root: %s", root)
 
-    for entry in _walk(root, exclude_patterns):
+    for entry in _walk(root, exclude_patterns, ignore_file):
         suffix = entry.suffix.lower()
         if language := EXTENSION_TO_LANGUAGE.get(suffix):
             results.append((entry, language))
@@ -71,7 +75,11 @@ def scan(
     return results
 
 
-def _walk(root: Path, exclude_patterns: tuple[str, ...]) -> list[Path]:
+def _walk(
+    root: Path,
+    exclude_patterns: tuple[str, ...],
+    ignore_file: IgnoreFile | None,
+) -> list[Path]:
     """Recursively yield file paths, skipping excluded directories and glob-matched files."""
     found: list[Path] = []
     try:
@@ -81,8 +89,16 @@ def _walk(root: Path, exclude_patterns: tuple[str, ...]) -> list[Path]:
                     continue
                 if _matches_any(child, exclude_patterns):
                     continue
-                found.extend(_walk(child, exclude_patterns))
-            elif child.is_file() and not _matches_any(child, exclude_patterns):
+                if ignore_file is not None and ignore_file.is_ignored(child):
+                    _logger.debug("Ignored (ignore file): %s", child)
+                    continue
+                found.extend(_walk(child, exclude_patterns, ignore_file))
+            elif child.is_file():
+                if _matches_any(child, exclude_patterns):
+                    continue
+                if ignore_file is not None and ignore_file.is_ignored(child):
+                    _logger.debug("Ignored (ignore file): %s", child)
+                    continue
                 found.append(child)
     except PermissionError as exc:
         _logger.warning("Permission denied reading %s: %s", root, exc)

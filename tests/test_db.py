@@ -5,7 +5,9 @@ Tests for codeecho.db (SessionDB).
 :since: 1.0.0
 """
 
-from codeecho.db import SessionDB
+from pathlib import Path
+
+from codeecho.db import SessionDB, get_db_path
 from codeecho.models import CloneGroup, Fragment
 
 
@@ -99,3 +101,27 @@ def test_cascade_delete(tmp_path):
         sdb.delete_session(sid)
         assert sdb.count_fragments(sid) == 0
         assert sdb.get_clone_groups(sid) == []
+
+
+# ---------------------------------------------------------------------------
+# get_db_path
+# ---------------------------------------------------------------------------
+
+
+def test_get_db_path_returns_string():
+    assert isinstance(get_db_path(), str)
+
+
+def test_get_db_path_default_ends_with_db_name():
+    result = get_db_path()
+    assert result.endswith("codeecho.db")
+    assert Path(result) == (Path.home() / ".codeecho").resolve() / "codeecho.db"
+
+
+def test_get_db_path_custom_dir(tmp_path):
+    result = get_db_path(str(tmp_path))
+    assert Path(result) == tmp_path.resolve() / "codeecho.db"
+
+
+def test_get_db_path_none_equals_default():
+    assert get_db_path(None) == get_db_path()

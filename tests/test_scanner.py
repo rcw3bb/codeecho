@@ -5,6 +5,10 @@ Tests for codeecho.scanner.
 :since: 1.0.0
 """
 
+from pathlib import Path
+
+from braincraft import IgnoreFile
+
 from codeecho.scanner import EXTENSION_TO_LANGUAGE, scan
 
 
@@ -55,3 +59,45 @@ def test_scan_subdirectory(tmp_path):
     results = scan(tmp_path)
     assert len(results) == 1
     assert results[0][1] == "Python"
+
+
+def test_scan_ignore_file_excludes_file(tmp_path):
+    """IgnoreFile patterns cause matching files to be excluded from results."""
+    keep = tmp_path / "keep.py"
+    keep.write_text("pass", encoding="utf-8")
+    skip = tmp_path / "generated.py"
+    skip.write_text("pass", encoding="utf-8")
+
+    ignore_path = tmp_path / ".ignore"
+    ignore_path.write_text("generated.py\n", encoding="utf-8")
+    ig = IgnoreFile(ignore_path, base_dir=tmp_path)
+
+    results = scan(tmp_path, ignore_file=ig)
+    paths = [str(p) for p, _ in results]
+    assert any("keep.py" in p for p in paths)
+    assert not any("generated.py" in p for p in paths)
+
+
+def test_scan_ignore_file_excludes_directory(tmp_path):
+    """IgnoreFile directory patterns cause the whole subtree to be excluded."""
+    gen_dir = tmp_path / "generated"
+    gen_dir.mkdir()
+    (gen_dir / "output.py").write_text("pass", encoding="utf-8")
+    keep = tmp_path / "main.py"
+    keep.write_text("pass", encoding="utf-8")
+
+    ignore_path = tmp_path / ".ignore"
+    ignore_path.write_text("generated/\n", encoding="utf-8")
+    ig = IgnoreFile(ignore_path, base_dir=tmp_path)
+
+    results = scan(tmp_path, ignore_file=ig)
+    paths = [str(p) for p, _ in results]
+    assert any("main.py" in p for p in paths)
+    assert not any("generated" in p for p in paths)
+
+
+def test_scan_ignore_file_none_does_not_raise(tmp_path):
+    """Passing ignore_file=None behaves like no ignore file (backward-compatible)."""
+    (tmp_path / "app.py").write_text("pass", encoding="utf-8")
+    results = scan(tmp_path, ignore_file=None)
+    assert len(results) == 1
