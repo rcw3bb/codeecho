@@ -1,9 +1,6 @@
 """
 Tree-sitter parser wrapper providing one cached :class:`tree_sitter.Parser` per language.
 
-Gosu (``.gs``) files are parsed using the Java grammar because Gosu is syntactically
-Java-like (methods, classes, blocks).
-
 :author: Ron Webb
 :since: 1.0.0
 """
@@ -16,9 +13,9 @@ from tree_sitter import Language, Parser, Tree
 _logger = logging.getLogger("codeecho.parser")
 
 
-def _build_language(
+def _build_language(  # pylint: disable=too-many-return-statements
     language_name: str,
-) -> Language | None:  # pylint: disable=too-many-return-statements
+) -> Language | None:
     """Instantiate and return the tree-sitter :class:`Language` for *language_name*."""
     match language_name:
         case "Python":
@@ -33,8 +30,12 @@ def _build_language(
             import tree_sitter_typescript as m  # pylint: disable=import-outside-toplevel
 
             return Language(m.language_typescript())
-        case "Java" | "Gosu":
+        case "Java":
             import tree_sitter_java as m  # pylint: disable=import-outside-toplevel
+
+            return Language(m.language())
+        case "Gosu":
+            import tree_sitter_gosu as m  # pylint: disable=import-outside-toplevel
 
             return Language(m.language())
         case "Go":

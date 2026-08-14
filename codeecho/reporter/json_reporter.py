@@ -62,6 +62,7 @@ def write(
 
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "version": result.version,
         "session_id": result.session_id,
         "scan_path": result.scan_path,
         "summary": {

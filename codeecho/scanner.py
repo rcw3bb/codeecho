@@ -51,27 +51,44 @@ _DEFAULT_EXCLUDE_DIRS: frozenset[str] = frozenset(
 
 
 def scan(
-    root: Path,
+    paths: tuple[Path, ...],
     exclude_patterns: tuple[str, ...] = (),
     ignore_file: IgnoreFile | None = None,
 ) -> list[tuple[Path, str]]:
-    """Walk *root* recursively and return ``(path, language)`` pairs for supported files.
+    """Walk *paths* and return ``(path, language)`` pairs for supported source files.
 
-    :param root: Root directory to scan.
+    Each entry in *paths* may be a file or a directory.  Directories are walked
+    recursively; files are checked for a supported extension and included directly.
+    Duplicate resolved paths across multiple entries are silently deduplicated.
+
+    :param paths: One or more file or directory paths to scan.
     :param exclude_patterns: Glob patterns (fnmatch-style) whose matching paths are skipped.
     :param ignore_file: Optional gitignore-style :class:`~braincraft.IgnoreFile`; matched paths are skipped.
     :returns: List of ``(absolute_path, language_name)`` tuples.
     """
     results: list[tuple[Path, str]] = []
-    root = root.resolve()
-    _logger.debug("Scanning root: %s", root)
+    seen: set[Path] = set()
 
-    for entry in _walk(root, exclude_patterns, ignore_file):
-        suffix = entry.suffix.lower()
-        if language := EXTENSION_TO_LANGUAGE.get(suffix):
-            results.append((entry, language))
+    for path in paths:
+        path = path.resolve()
+        _logger.debug("Scanning: %s", path)
+        if path.is_file():
+            if path in seen or _matches_any(path, exclude_patterns):
+                continue
+            seen.add(path)
+            if ignore_file is not None and ignore_file.is_ignored(path):
+                _logger.debug("Ignored (ignore file): %s", path)
+                continue
+            if language := EXTENSION_TO_LANGUAGE.get(path.suffix.lower()):
+                results.append((path, language))
+        elif path.is_dir():
+            for entry in _walk(path, exclude_patterns, ignore_file):
+                if entry not in seen:
+                    seen.add(entry)
+                    if language := EXTENSION_TO_LANGUAGE.get(entry.suffix.lower()):
+                        results.append((entry, language))
 
-    _logger.debug("Found %d source files under %s", len(results), root)
+    _logger.debug("Found %d source files across %d path(s)", len(results), len(paths))
     return results
 
 

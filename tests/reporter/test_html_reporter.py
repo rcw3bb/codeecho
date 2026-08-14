@@ -53,7 +53,8 @@ def test_html_report_created(session_db, session_id, tmp_path):
     _seed_db(session_db, session_id)
     result = ScanResult(
         session_id=session_id,
-        scan_path="/src",
+        version="1.0.0",
+        scan_path=["/src"],
         files_scanned=2,
         fragments_extracted=2,
         type1_groups=1,
@@ -67,13 +68,15 @@ def test_html_report_created(session_db, session_id, tmp_path):
     assert "<!DOCTYPE html>" in content
     assert "CodeEcho" in content
     assert "Type-1" in content
+    assert "v1.0.0" in content
 
 
 def test_html_contains_source(session_db, session_id, tmp_path):
     _seed_db(session_db, session_id)
     result = ScanResult(
         session_id=session_id,
-        scan_path="/src",
+        version="1.0.0",
+        scan_path=["/src"],
         files_scanned=2,
         fragments_extracted=2,
         type1_groups=1,

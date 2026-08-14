@@ -40,11 +40,12 @@ class CloneGroup:
 
 
 @dataclass
-class ScanResult:
+class ScanResult:  # pylint: disable=too-many-instance-attributes
     """Summary statistics for a completed duplicate detection scan."""
 
     session_id: str
-    scan_path: str
+    version: str
+    scan_path: list[str]
     files_scanned: int
     fragments_extracted: int
     type1_groups: int

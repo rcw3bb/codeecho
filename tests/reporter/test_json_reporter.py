@@ -55,7 +55,8 @@ def test_json_report_structure(session_db, session_id, tmp_path):
     _seed_db(session_db, session_id)
     result = ScanResult(
         session_id=session_id,
-        scan_path="/src",
+        version="1.0.0",
+        scan_path=["/src"],
         files_scanned=2,
         fragments_extracted=2,
         type1_groups=1,
@@ -66,6 +67,7 @@ def test_json_report_structure(session_db, session_id, tmp_path):
     json_reporter.write(session_db, result, out)
     assert out.exists()
     data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["version"] == "1.0.0"
     assert data["summary"]["files_scanned"] == 2
     assert data["summary"]["type1_groups"] == 1
     assert len(data["clone_groups"]) == 1
@@ -77,7 +79,8 @@ def test_json_report_structure(session_db, session_id, tmp_path):
 def test_json_report_no_groups(session_db, session_id, tmp_path):
     result = ScanResult(
         session_id=session_id,
-        scan_path="/src",
+        version="1.0.0",
+        scan_path=["/src"],
         files_scanned=0,
         fragments_extracted=0,
         type1_groups=0,

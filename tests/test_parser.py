@@ -10,19 +10,19 @@ import pytest
 from codeecho.parser import get_language, get_parser, parse
 
 
-@pytest.mark.parametrize("lang", ["Python", "JavaScript", "TypeScript", "Java", "Go"])
+@pytest.mark.parametrize(
+    "lang", ["Python", "JavaScript", "TypeScript", "Java", "Go", "Gosu"]
+)
 def test_get_language_known(lang):
     assert get_language(lang) is not None
 
 
-def test_get_language_gosu_uses_java():
+def test_get_language_gosu_is_distinct_from_java():
     gosu_lang = get_language("Gosu")
     java_lang = get_language("Java")
     assert gosu_lang is not None
     assert java_lang is not None
-    # Both use the same Java grammar — they share the same internal grammar ID
-    assert gosu_lang.abi_version == java_lang.abi_version
-    assert gosu_lang.node_kind_count == java_lang.node_kind_count
+    assert gosu_lang is not java_lang
 
 
 def test_get_language_unknown():

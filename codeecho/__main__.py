@@ -6,6 +6,8 @@ Invoked via::
     poetry run python -m codeecho [OPTIONS] PATH
 """
 
+import json
+import os
 import uuid
 from pathlib import Path
 
@@ -57,7 +59,9 @@ def _parse_types(types_str: str) -> set[int]:
     version=__version__, prog_name="codeecho", message="%(prog)s v%(version)s"
 )
 @click.argument(
-    "path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path)
+    "paths",
+    nargs=-1,
+    type=click.Path(exists=True, file_okay=True, dir_okay=True, path_type=Path),
 )
 @click.option(
     "--types",
@@ -117,7 +121,7 @@ def _parse_types(types_str: str) -> set[int]:
     help="Glob pattern(s) to exclude from scanning (repeatable).",
 )
 def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,invalid-name
-    path: Path,
+    paths: tuple[Path, ...],
     types: str,
     threshold: float,
     output: str,
@@ -127,10 +131,10 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
     min_tokens: int,
     exclude: tuple[str, ...],
 ) -> None:
-    """Scan PATH for duplicate and near-duplicate code.
+    """Scan one or more PATH(s) for duplicate and near-duplicate code.
 
-    Generates JSON and/or HTML reports, then removes the intermediate session data
-    from the embedded database.
+    Each PATH may be a file or a directory.  Generates JSON and/or HTML reports,
+    then removes the intermediate session data from the embedded database.
     """
     _console.print(
         Panel(
@@ -138,6 +142,9 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
             border_style="dim",
         )
     )
+
+    if not paths:
+        raise click.UsageError("At least one PATH is required.")
 
     detect_types = _parse_types(types)
     if output_dir is None:
@@ -152,14 +159,27 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    resolved = [p.resolve() for p in paths]
+
     db_path = Path(get_db_path(str(db_dir) if db_dir else None))
     with SessionDB(db_path=db_path) as session_db:
-        session_db.create_session(session_id, str(path.resolve()), config)
+        session_db.create_session(
+            session_id, json.dumps([str(p) for p in resolved]), config
+        )
 
         # ── Phase 1: File discovery ─────────────────────────────────────────
-        _console.print(f"[dim]Scanning:[/dim] [bold]{path.resolve()}[/bold]")
-        _ignore_file = IgnoreFile(Path(CONF_DIR) / ".ignore", base_dir=path.resolve())
-        files = scanner.scan(path, exclude_patterns=exclude, ignore_file=_ignore_file)
+        for p in resolved:
+            _console.print(f"[dim]Scanning:[/dim] [bold]{p}[/bold]")
+        try:
+            base_dir = Path(os.path.commonpath(resolved))
+            if not base_dir.is_dir():
+                base_dir = base_dir.parent
+        except ValueError:
+            base_dir = Path.cwd()
+        _ignore_file = IgnoreFile(Path(CONF_DIR) / ".ignore", base_dir=base_dir)
+        files = scanner.scan(
+            tuple(resolved), exclude_patterns=exclude, ignore_file=_ignore_file
+        )
         total_fragments = 0
 
         if not files:
@@ -177,7 +197,8 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
 
         result = ScanResult(
             session_id=session_id,
-            scan_path=str(path.resolve()),
+            version=__version__,
+            scan_path=[str(p) for p in resolved],
             files_scanned=len(files),
             fragments_extracted=total_fragments,
             type1_groups=cnt1,
