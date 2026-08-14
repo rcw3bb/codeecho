@@ -36,7 +36,8 @@ def test_clone_group_defaults():
 def test_scan_result_fields():
     result = ScanResult(
         session_id="s1",
-        scan_path="/root",
+        version="1.0.0",
+        scan_path=["/root"],
         files_scanned=5,
         fragments_extracted=20,
         type1_groups=1,

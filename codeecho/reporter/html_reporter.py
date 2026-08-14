@@ -79,7 +79,7 @@ _TEMPLATE: str = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-<h1>CodeEcho</h1>
+<h1>CodeEcho <span style="color:var(--muted);font-size:1rem;font-weight:400">v{{ result.version }}</span></h1>
 <div class="subtitle">Clone Detection Report &mdash; {{ generated_at }}</div>
 
 <div class="toolbar">
@@ -149,7 +149,7 @@ _TEMPLATE: str = """<!DOCTYPE html>
 </details>
 {% endfor %}
 
-<footer>Scan path: {{ result.scan_path }} &bull; Session: {{ result.session_id }}</footer>
+<footer>Scan path{{ 's' if result.scan_path | length > 1 else '' }}: {{ result.scan_path | join(', ') }} &bull; Session: {{ result.session_id }}</footer>
 
 <script>
 function toggleAll(open) {

@@ -72,3 +72,39 @@ def test_db_dir_is_distinct_from_output_dir(tmp_path):
     assert (db_dir / "codeecho.db").exists()
     # No files scanned → no report written, but the directory may be created
     assert not (out_dir / "codeecho-output.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# multi-path argument
+# ---------------------------------------------------------------------------
+
+
+def test_no_path_provided_exits_with_error():
+    """Invoking without any PATH argument exits with a usage error."""
+    runner = CliRunner()
+    result = runner.invoke(main, [])
+    assert result.exit_code != 0
+
+
+def test_single_file_path_is_accepted(tmp_path):
+    """A single file path (not a directory) is accepted as a valid scan target."""
+    f = tmp_path / "main.py"
+    f.write_text("pass", encoding="utf-8")
+    db_dir = tmp_path / "db"
+    runner = CliRunner()
+    with patch("codeecho.__main__.scanner.scan", return_value=[]):
+        result = runner.invoke(main, [str(f), "--db-dir", str(db_dir)])
+    assert result.exit_code == 0
+
+
+def test_multiple_paths_are_accepted(tmp_path):
+    """Two directory paths can both be specified as scan targets."""
+    dir_a = tmp_path / "a"
+    dir_b = tmp_path / "b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    db_dir = tmp_path / "db"
+    runner = CliRunner()
+    with patch("codeecho.__main__.scanner.scan", return_value=[]):
+        result = runner.invoke(main, [str(dir_a), str(dir_b), "--db-dir", str(db_dir)])
+    assert result.exit_code == 0
