@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 - 2026-08-15
+
+### Added
+
+- Gosu (`.gs`, `.gsx`) is now parsed with a dedicated [tree-sitter-gosu](https://github.com/rcw3bb/tree-sitter-gosu)
+  grammar instead of the Java fallback, enabling accurate fragment extraction using Gosu-native node types
+  (`compilation_unit`, `function_declaration`, `constructor_declaration`, `class_declaration`).
+
 ## 1.0.1 - 2026-07-10
 
 ### Fixed

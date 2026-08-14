@@ -53,6 +53,7 @@
 - All new code must achieve pylint 10.00/10 before committing.
 - Never modify pyproject.toml `[build-system]`, .pylintrc, or .gitattributes without approval.
 - Always use `poetry run <cmd>` — never invoke python, black, pylint, or pytest directly.
+- When bumping the version, keep all three in sync: `pyproject.toml` (via `poetry version`), `__version__` in `codeecho/__init__.py`, and the version badge/reference in `README.md`.
 - When you create or discover new files, update the Tree above.
 
 ## Note-taking

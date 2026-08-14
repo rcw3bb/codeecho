@@ -1,9 +1,9 @@
-# codeecho 1.0.1
+# codeecho 1.1.0
 
 > A developer tool that scans your codebase to detect and highlight **echoes** of duplicated or near-duplicated code, so you can refactor toward cleaner, more maintainable designs.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
 
 ## Prerequisites
 
@@ -31,14 +31,14 @@ python -m codeecho <path> [options]
 
 ### Supported languages
 
-| Language | Extensions |
-|----------|-----------|
-| Python | `.py` |
-| JavaScript | `.js`, `.mjs`, `.cjs` |
-| TypeScript | `.ts`, `.tsx` |
-| Java | `.java` |
-| Go | `.go` |
-| Gosu | `.gs`, `.gsx` |
+| Language | Extensions | Grammar |
+|----------|-----------|--------|
+| Python | `.py` | [tree-sitter-python](https://github.com/tree-sitter/tree-sitter-python) |
+| JavaScript | `.js`, `.mjs`, `.cjs` | [tree-sitter-javascript](https://github.com/tree-sitter/tree-sitter-javascript) |
+| TypeScript | `.ts`, `.tsx` | [tree-sitter-typescript](https://github.com/tree-sitter/tree-sitter-typescript) |
+| Java | `.java` | [tree-sitter-java](https://github.com/tree-sitter/tree-sitter-java) |
+| Go | `.go` | [tree-sitter-go](https://github.com/tree-sitter/tree-sitter-go) |
+| Gosu | `.gs`, `.gsx` | [tree-sitter-gosu](https://github.com/rcw3bb/tree-sitter-gosu) |
 
 ### Arguments
 
