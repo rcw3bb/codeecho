@@ -35,7 +35,10 @@ class _UnionFind:
         self._parent: dict[str, str] = {}
 
     def find(self, node: str) -> str:
-        """Return the representative of *node*'s set (with path compression)."""
+        """Return the representative of *node*'s set (with path compression).
+
+        :since: 1.0.0
+        """
         if node not in self._parent:
             self._parent[node] = node
         if self._parent[node] != node:
@@ -43,13 +46,19 @@ class _UnionFind:
         return self._parent[node]
 
     def union(self, node_a: str, node_b: str) -> None:
-        """Merge the sets containing *node_a* and *node_b*."""
+        """Merge the sets containing *node_a* and *node_b*.
+
+        :since: 1.0.0
+        """
         root_a, root_b = self.find(node_a), self.find(node_b)
         if root_a != root_b:
             self._parent[root_a] = root_b
 
     def groups(self, members: list[str]) -> dict[str, list[str]]:
-        """Return a mapping ``{representative: [member_ids]}`` for *members*."""
+        """Return a mapping ``{representative: [member_ids]}`` for *members*.
+
+        :since: 1.0.0
+        """
         result: dict[str, list[str]] = defaultdict(list)
         for item in members:
             result[self.find(item)].append(item)
@@ -60,7 +69,10 @@ class _UnionFind:
 
 
 def _jaccard(tokens_a: list[str], tokens_b: list[str]) -> float:
-    """Return the Jaccard similarity between two token lists (treated as sets)."""
+    """Return the Jaccard similarity between two token lists (treated as sets).
+
+    :since: 1.0.0
+    """
     set_a = set(tokens_a)
     set_b = set(tokens_b)
     union = set_a | set_b
@@ -92,7 +104,10 @@ def _make_group(
 def _detect_type1(
     fragments: list[Fragment], session_id: str
 ) -> tuple[list[CloneGroup], set[str]]:
-    """Group fragments by raw hash.  Return groups and the set of assigned fragment IDs."""
+    """Group fragments by raw hash.  Return groups and the set of assigned fragment IDs.
+
+    :since: 1.0.0
+    """
     by_hash: dict[str, list[str]] = defaultdict(list)
     for frag in fragments:
         if frag.raw_hash:
@@ -111,7 +126,10 @@ def _detect_type1(
 def _detect_type2(
     fragments: list[Fragment], assigned: set[str], session_id: str
 ) -> tuple[list[CloneGroup], set[str]]:
-    """Group unassigned fragments by normalised hash."""
+    """Group unassigned fragments by normalised hash.
+
+    :since: 1.0.0
+    """
     by_norm: dict[str, list[str]] = defaultdict(list)
     for frag in fragments:
         if frag.fragment_id not in assigned and frag.normalized_hash:
@@ -128,7 +146,10 @@ def _detect_type2(
 
 
 def _is_nested(frag_a: Fragment, frag_b: Fragment) -> bool:
-    """Return True when *frag_a* and *frag_b* are from the same file and one contains the other."""
+    """Return True when *frag_a* and *frag_b* are from the same file and one contains the other.
+
+    :since: 1.0.1
+    """
     if frag_a.file_path != frag_b.file_path:
         return False
     a_contains_b = (
@@ -147,7 +168,10 @@ def _compare_pair(
     union_find: "_UnionFind",
     pair_scores: dict[tuple[str, str], float],
 ) -> None:
-    """Compare a single fragment pair and register a union if similarity >= threshold."""
+    """Compare a single fragment pair and register a union if similarity >= threshold.
+
+    :since: 1.0.0
+    """
     if _is_nested(frag_a, frag_b):
         return
     count_a, count_b = frag_a.token_count, frag_b.token_count
@@ -172,6 +196,8 @@ def _remove_nested_members(
     When a group contains two fragments from the same file where one's line range is fully
     contained within the other's, the outer (larger) fragment is removed — it is redundant
     because the inner fragment is the more specific code unit.
+
+    :since: 1.0.1
     """
     to_remove: set[str] = set()
     ids = list(member_ids)
@@ -195,7 +221,10 @@ def _detect_type3(
     session_id: str,
     threshold: float,
 ) -> list[CloneGroup]:
-    """Pairwise Jaccard comparison for remaining fragments; clusters via union-find."""
+    """Pairwise Jaccard comparison for remaining fragments; clusters via union-find.
+
+    :since: 1.0.0
+    """
     candidates = [
         f for f in fragments if f.fragment_id not in assigned and f.token_count > 0
     ]
@@ -226,7 +255,10 @@ def _detect_type3(
 def _group_min_similarity(
     member_ids: list[str], pair_scores: dict[tuple[str, str], float]
 ) -> float | None:
-    """Return the minimum pairwise similarity score among *member_ids*."""
+    """Return the minimum pairwise similarity score among *member_ids*.
+
+    :since: 1.0.0
+    """
     scores: list[float] = []
     for idx in range(len(member_ids)):  # pylint: disable=consider-using-enumerate
         for jdx in range(idx + 1, len(member_ids)):
@@ -258,6 +290,8 @@ def detect(
 
     Returns:
         ``(type1_count, type2_count, type3_count)`` group counts.
+
+    :since: 1.0.0
     """
     fragments = session_db.get_fragments(session_id)
     _logger.debug("Detecting clones in %d fragments.", len(fragments))

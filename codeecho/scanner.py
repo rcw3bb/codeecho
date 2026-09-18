@@ -65,6 +65,7 @@ def scan(
     :param exclude_patterns: Glob patterns (fnmatch-style) whose matching paths are skipped.
     :param ignore_file: Optional gitignore-style :class:`~braincraft.IgnoreFile`; matched paths are skipped.
     :returns: List of ``(absolute_path, language_name)`` tuples.
+    :since: 1.0.0
     """
     results: list[tuple[Path, str]] = []
     seen: set[Path] = set()
@@ -97,7 +98,10 @@ def _walk(
     exclude_patterns: tuple[str, ...],
     ignore_file: IgnoreFile | None,
 ):
-    """Recursively collect file paths, skipping excluded directories and glob-matched files."""
+    """Recursively collect file paths, skipping excluded directories and glob-matched files.
+
+    :since: 1.0.0
+    """
     try:
         for child in sorted(root.iterdir()):
             if child.is_dir():
@@ -121,6 +125,9 @@ def _walk(
 
 
 def _matches_any(path: Path, patterns: tuple[str, ...]) -> bool:
-    """Return True if *path* matches any of the given fnmatch-style *patterns*."""
+    """Return True if *path* matches any of the given fnmatch-style *patterns*.
+
+    :since: 1.0.0
+    """
     path_str = str(path)
     return any(fnmatch.fnmatch(path_str, p) for p in patterns)

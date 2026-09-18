@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 - 2026-09-18
+
+### Added
+
+- `config.ini` (seeded into `CODEECHO_CONFIG_DIR`) with an `[override]` section that lets you rename
+  the `.ignore` file via the `ignore-file` key. Falls back to the bundled `.ignore` when the
+  configured file is missing.
+- `--target-list` flag: treat `PATH` as a single file listing scan targets, one per line (blank
+  lines and `#`-prefixed comments are skipped), instead of passing `PATH` arguments directly.
+
 ## 1.1.0 - 2026-08-15
 
 ### Added

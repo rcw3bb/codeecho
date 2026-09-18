@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
 
-from codeecho.models import CloneGroup, Fragment
+from .models import CloneGroup, Fragment
 
 _logger = logging.getLogger("codeecho.db")
 
@@ -31,6 +31,7 @@ def get_db_path(db_dir: str | None = None) -> str:
 
     :param db_dir: Optional directory that overrides the default location.
     :return: Absolute path to the ``codeecho.db`` file.
+    :since: 1.0.0
     """
     directory = Path(db_dir) if db_dir else _DEFAULT_DIR
     return str(directory.resolve() / _DB_NAME)
@@ -152,7 +153,10 @@ class SessionDB:
     def create_session(
         self, session_id: str, scan_path: str, config: dict[str, object]
     ) -> None:
-        """Insert a new scan session record."""
+        """Insert a new scan session record.
+
+        :since: 1.0.0
+        """
         self._connection.execute(
             "INSERT INTO sessions (id, created_at, scan_path, config_json) VALUES (?, ?, ?, ?)",
             (
@@ -164,7 +168,10 @@ class SessionDB:
         )
 
     def delete_session(self, session_id: str) -> None:
-        """Delete the session and all its fragments/groups via CASCADE."""
+        """Delete the session and all its fragments/groups via CASCADE.
+
+        :since: 1.0.0
+        """
         self._connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         _logger.debug("Session %s deleted from database.", session_id)
 
@@ -173,7 +180,10 @@ class SessionDB:
     # ------------------------------------------------------------------
 
     def insert_many_fragments(self, fragments: list[Fragment]) -> None:
-        """Bulk-insert a list of fully-populated Fragment objects."""
+        """Bulk-insert a list of fully-populated Fragment objects.
+
+        :since: 1.0.0
+        """
         self._connection.executemany(
             """
             INSERT INTO fragments
@@ -202,21 +212,30 @@ class SessionDB:
         )
 
     def get_fragments(self, session_id: str) -> list[Fragment]:
-        """Return all fragments for a session."""
+        """Return all fragments for a session.
+
+        :since: 1.0.0
+        """
         rows = self._connection.execute(
             "SELECT * FROM fragments WHERE session_id = ?", (session_id,)
         ).fetchall()
         return [_row_to_fragment(r) for r in rows]
 
     def get_fragment_by_id(self, fragment_id: str) -> Fragment | None:
-        """Return a single Fragment by its ID, or None if not found."""
+        """Return a single Fragment by its ID, or None if not found.
+
+        :since: 1.0.0
+        """
         row = self._connection.execute(
             "SELECT * FROM fragments WHERE id = ?", (fragment_id,)
         ).fetchone()
         return _row_to_fragment(row) if row else None
 
     def get_fragments_by_ids(self, fragment_ids: list[str]) -> list[Fragment]:
-        """Fetch multiple fragments by ID in one query."""
+        """Fetch multiple fragments by ID in one query.
+
+        :since: 1.0.0
+        """
         if not fragment_ids:
             return []
         placeholders = ",".join("?" * len(fragment_ids))
@@ -226,7 +245,10 @@ class SessionDB:
         return [_row_to_fragment(r) for r in rows]
 
     def count_fragments(self, session_id: str) -> int:
-        """Return the number of fragments stored for a session."""
+        """Return the number of fragments stored for a session.
+
+        :since: 1.0.0
+        """
         row = self._connection.execute(
             "SELECT COUNT(*) AS cnt FROM fragments WHERE session_id = ?", (session_id,)
         ).fetchone()
@@ -237,7 +259,10 @@ class SessionDB:
     # ------------------------------------------------------------------
 
     def insert_clone_group(self, group: CloneGroup) -> None:
-        """Persist a CloneGroup and its member associations."""
+        """Persist a CloneGroup and its member associations.
+
+        :since: 1.0.0
+        """
         self._connection.execute(
             "INSERT INTO clone_groups (id, session_id, clone_type, representative_hash, similarity_score) "
             "VALUES (?, ?, ?, ?, ?)",
@@ -255,7 +280,10 @@ class SessionDB:
         )
 
     def get_clone_groups(self, session_id: str) -> list[CloneGroup]:
-        """Return all clone groups with member fragment IDs for a session."""
+        """Return all clone groups with member fragment IDs for a session.
+
+        :since: 1.0.0
+        """
         rows = self._connection.execute(
             """
             SELECT cg.id, cg.session_id, cg.clone_type,
@@ -285,5 +313,8 @@ class SessionDB:
         return list(seen.values())
 
     def get_fragments_for_group(self, group: CloneGroup) -> list[Fragment]:
-        """Fetch Fragment objects belonging to a CloneGroup."""
+        """Fetch Fragment objects belonging to a CloneGroup.
+
+        :since: 1.0.0
+        """
         return self.get_fragments_by_ids(group.member_fragment_ids)

@@ -16,7 +16,10 @@ _logger = logging.getLogger("codeecho.parser")
 def _build_language(  # pylint: disable=too-many-return-statements
     language_name: str,
 ) -> Language | None:
-    """Instantiate and return the tree-sitter :class:`Language` for *language_name*."""
+    """Instantiate and return the tree-sitter :class:`Language` for *language_name*.
+
+    :since: 1.0.0
+    """
     match language_name:
         case "Python":
             import tree_sitter_python as m  # pylint: disable=import-outside-toplevel
@@ -48,7 +51,10 @@ def _build_language(  # pylint: disable=too-many-return-statements
 
 @lru_cache(maxsize=None)
 def get_language(language_name: str) -> Language | None:
-    """Return a cached :class:`tree_sitter.Language` for *language_name*, or ``None`` on failure."""
+    """Return a cached :class:`tree_sitter.Language` for *language_name*, or ``None`` on failure.
+
+    :since: 1.0.0
+    """
     try:
         lang = _build_language(language_name)
     except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -67,6 +73,8 @@ def get_parser(language_name: str) -> Parser | None:
         The returned parser is NOT used directly for parsing; call :func:`parse` instead,
         which creates a fresh :class:`~tree_sitter.Parser` instance per call to avoid
         internal state corruption across files in tree-sitter 0.26+.
+
+    :since: 1.0.0
     """
     lang = get_language(language_name)
     if lang is None:
@@ -83,6 +91,7 @@ def parse(source_bytes: bytes, language_name: str) -> Tree | None:
     :param source_bytes: UTF-8-encoded source code.
     :param language_name: Name as returned by :data:`codeecho.scanner.EXTENSION_TO_LANGUAGE`.
     :returns: Parsed :class:`tree_sitter.Tree`, or ``None`` if the grammar is unavailable.
+    :since: 1.0.0
     """
     lang = get_language(language_name)
     if lang is None:

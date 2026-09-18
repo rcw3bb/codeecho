@@ -1,9 +1,8 @@
-# codeecho 1.1.0
+# codeecho 1.2.0
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/rcw3bb/codeecho/blob/main/LICENSE) [![Version](https://img.shields.io/badge/Version-1.2.0-green.svg)](https://github.com/rcw3bb/codeecho/blob/main/CHANGELOG.md) [![Python](https://img.shields.io/badge/Python-3.14%2B-blue)](https://www.python.org/) [![PyPI](https://img.shields.io/badge/PyPI-codeecho-orange)](https://pypi.org/project/codeecho/)
 
 > A developer tool that scans your codebase to detect and highlight **echoes** of duplicated or near-duplicated code, so you can refactor toward cleaner, more maintainable designs.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
 
 ## Prerequisites
 
@@ -58,6 +57,7 @@ python -m codeecho <path> [options]
 | `--format <fmt>` | `both` | Output format: `json`, `html`, or `both`. |
 | `--min-tokens <n>` | `10` | Minimum token count for a code fragment to be included. |
 | `--exclude <pattern>` | _(none)_ | Glob pattern(s) to exclude from scanning (repeatable). |
+| `--target-list` | `false` | Treat `PATH` as a single existing file listing target paths (files and/or directories), one per line, instead of individual `PATH` arguments. Blank lines and lines starting with `#` are skipped. |
 | `--version` | | Print the version and exit. |
 | `-h, --help` | | Show help and exit. |
 
@@ -93,15 +93,32 @@ Exclude test and vendor directories:
 python -m codeecho . --exclude "*/tests/*" --exclude "*/vendor/*"
 ```
 
+Scan targets listed in a file, one path per line:
+
+```powershell
+python -m codeecho targets.txt --target-list
+```
+
 ## Configuration
 
 | Environment variable | Description |
 |----------------------|-------------|
-| `CODEECHO_CONFIG_DIR` | Directory where `logging.ini` and `.ignore` are seeded on first run. When unset, the bundled copies inside the package are used directly. |
+| `CODEECHO_CONFIG_DIR` | Directory where `logging.ini`, `.ignore`, and `config.ini` are seeded on first run. When unset, the bundled copies inside the package are used directly. |
 
 ### `.ignore` file
 
 On first run, a `.ignore` file is seeded into `CODEECHO_CONFIG_DIR` (or the package directory when unset). It follows gitignore syntax and is applied during file scanning to exclude paths in addition to any `--exclude` patterns passed on the command line. Edit this file to permanently suppress paths you never want scanned.
+
+### Overriding the ignore filename
+
+`config.ini` (also seeded into `CODEECHO_CONFIG_DIR` on first run) contains an `[override]` section with an `ignore-file` key, which names the file used in place of `.ignore`, resolved relative to `CODEECHO_CONFIG_DIR`:
+
+```ini
+[override]
+ignore-file = .ignore
+```
+
+Point `ignore-file` at a different filename to use an alternate ignore file (also placed inside `CODEECHO_CONFIG_DIR`). If the configured file is missing, codeecho logs a warning and falls back to the bundled `.ignore`.
 
 ## Development
 
@@ -151,11 +168,11 @@ poetry run pylint codeecho
 poetry run pytest --cov=codeecho tests --cov-report html
 ```
 
-## [Changelog](CHANGELOG.md)
+## [Changelog](https://github.com/rcw3bb/codeecho/blob/main/CHANGELOG.md)
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](https://github.com/rcw3bb/codeecho/blob/main/LICENSE).
 
 ## Author
 

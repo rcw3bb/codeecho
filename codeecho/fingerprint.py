@@ -20,6 +20,7 @@ def hash_fragment(fragment: Fragment) -> None:
 
     :param fragment: A :class:`~codeecho.models.Fragment` whose ``token_sequence``
                      and ``normalized_tokens`` are already populated.
+    :since: 1.0.0
     """
     fragment.raw_hash = _sha256(_SEP.join(fragment.token_sequence))
     fragment.normalized_hash = _sha256(_SEP.join(fragment.normalized_tokens))
@@ -27,12 +28,18 @@ def hash_fragment(fragment: Fragment) -> None:
 
 
 def hash_all(fragments: list[Fragment]) -> None:
-    """Apply :func:`hash_fragment` to every item in *fragments*."""
+    """Apply :func:`hash_fragment` to every item in *fragments*.
+
+    :since: 1.0.0
+    """
     for frag in fragments:
         hash_fragment(frag)
     _logger.debug("Hashed %d fragments.", len(fragments))
 
 
 def _sha256(text: str) -> str:
-    """Return the hex-encoded SHA-256 digest of *text*."""
+    """Return the hex-encoded SHA-256 digest of *text*.
+
+    :since: 1.0.0
+    """
     return hashlib.sha256(text.encode("utf-8")).hexdigest()

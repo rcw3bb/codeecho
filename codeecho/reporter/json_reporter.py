@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from codeecho.db import SessionDB
-from codeecho.models import CloneGroup, Fragment, ScanResult
+from ..db import SessionDB
+from ..models import CloneGroup, Fragment, ScanResult
 
 _logger = logging.getLogger("codeecho.reporter.json")
 
@@ -53,6 +53,7 @@ def write(
     :param result: Summary statistics from the scan.
     :param output_path: Destination JSON file path.
     :returns: The resolved path of the written file.
+    :since: 1.0.0
     """
     groups = session_db.get_clone_groups(result.session_id)
     groups_data: list[dict[str, Any]] = []
