@@ -9,6 +9,12 @@
   configured file is missing.
 - `--target-list` flag: treat `PATH` as a single file listing scan targets, one per line (blank
   lines and `#`-prefixed comments are skipped), instead of passing `PATH` arguments directly.
+- `--basis` flag: file listing basis target paths, one per line — same format as
+  `--target-list`. Absolute file/directory entries are merged into the scan automatically
+  and matched exactly; relative entries (e.g. a bare filename) are matched by filename/suffix
+  against any file discovered in the scan. The report is filtered to only clone groups
+  touching at least one basis file, and groups duplicated purely among basis files are
+  flagged (`basis_internal` in JSON, a "Basis-to-Basis" badge in HTML, `is_basis` per member).
 
 ## 1.1.0 - 2026-08-15
 

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from jinja2 import BaseLoader, Environment
 
+from .. import basis as basis_module
 from ..db import SessionDB
 from ..models import ScanResult
 
@@ -53,6 +54,11 @@ _TEMPLATE: str = """<!DOCTYPE html>
   .type-badge{display:inline-block;border-radius:4px;padding:2px 8px;font-size:.75rem;
               font-weight:600;color:#fff}
   .t1{background:var(--t1)}.t2{background:var(--t2)}.t3{background:var(--t3)}
+  .basis-badge{display:inline-block;border-radius:4px;padding:2px 8px;font-size:.75rem;
+               font-weight:600;color:#fff;background:#a855f7}
+  .basis-chip{display:inline-block;border-radius:4px;padding:1px 6px;font-size:.7rem;
+              font-weight:600;color:#a855f7;border:1px solid #a855f7;margin-left:.4rem}
+  .basis-count{font-size:1.1rem;font-weight:600;color:#a855f7;margin-left:.15rem}
   .type-section{margin-bottom:.5rem}
   .type-section>summary{display:flex;align-items:center;gap:.5rem;list-style:none;
                          font-size:1.1rem;font-weight:600;padding:.6rem .5rem .4rem;
@@ -98,15 +104,15 @@ _TEMPLATE: str = """<!DOCTYPE html>
     <div class="stat-lbl">Fragments</div>
   </div>
   <div class="stat clickable" data-type="1" onclick="filterType(1)">
-    <div class="stat-val" style="color:var(--t1)">{{ result.type1_groups }}</div>
+    <div class="stat-val" style="color:var(--t1)">{{ result.type1_groups }}{% if basis_files is not none %}<span class="basis-count">({{ result.basis_type1_groups }})</span>{% endif %}</div>
     <div class="stat-lbl">Type-1 Groups</div>
   </div>
   <div class="stat clickable" data-type="2" onclick="filterType(2)">
-    <div class="stat-val" style="color:var(--t2)">{{ result.type2_groups }}</div>
+    <div class="stat-val" style="color:var(--t2)">{{ result.type2_groups }}{% if basis_files is not none %}<span class="basis-count">({{ result.basis_type2_groups }})</span>{% endif %}</div>
     <div class="stat-lbl">Type-2 Groups</div>
   </div>
   <div class="stat clickable" data-type="3" onclick="filterType(3)">
-    <div class="stat-val" style="color:var(--t3)">{{ result.type3_groups }}</div>
+    <div class="stat-val" style="color:var(--t3)">{{ result.type3_groups }}{% if basis_files is not none %}<span class="basis-count">({{ result.basis_type3_groups }})</span>{% endif %}</div>
     <div class="stat-lbl">Type-3 Groups</div>
   </div>
 </div>
@@ -127,6 +133,9 @@ _TEMPLATE: str = """<!DOCTYPE html>
     <summary class="group-header">
       <i class="chevron">&#9658;</i>
       <span class="group-title">Group {{ loop.index }} &mdash; {{ entry.members | length }} members</span>
+      {% if entry.basis_internal %}
+      <span class="basis-badge">Basis-to-Basis</span>
+      {% endif %}
       {% if entry.group.similarity_score is not none %}
       <span class="group-meta">similarity {{ "%.0f"|format(entry.group.similarity_score * 100) }}%</span>
       {% endif %}
@@ -137,6 +146,9 @@ _TEMPLATE: str = """<!DOCTYPE html>
         <strong>{{ frag.language }}</strong> {{ frag.fragment_type }} &bull;
         <strong>{{ frag.file_path }}</strong>
         lines {{ frag.start_line }}–{{ frag.end_line }}
+        {% if basis_files and frag.file_path in basis_files %}
+        <span class="basis-chip">BASIS</span>
+        {% endif %}
       </div>
       <pre>{{ frag.source_text }}</pre>
     </div>
@@ -149,7 +161,7 @@ _TEMPLATE: str = """<!DOCTYPE html>
 </details>
 {% endfor %}
 
-<footer>Scan path{{ 's' if result.scan_path | length > 1 else '' }}: {{ result.scan_path | join(', ') }} &bull; Session: {{ result.session_id }}</footer>
+<footer>Scan path{{ 's' if result.scan_path | length > 1 else '' }}: {{ result.scan_path | join(', ') }} &bull; Session: {{ result.session_id }}{% if result.basis_paths %} &bull; Basis: {{ result.basis_paths | join(', ') }}{% endif %}</footer>
 
 <script>
 function toggleAll(open) {
@@ -183,27 +195,46 @@ def write(
     session_db: SessionDB,
     result: ScanResult,
     output_path: Path,
+    basis_files: frozenset[str] | None = None,
 ) -> Path:
     """Render all clone groups for *result.session_id* to an HTML file at *output_path*.
+
+    When *basis_files* is given, only groups touching at least one basis file are
+    rendered, groups duplicated purely among basis files get a distinct badge, and
+    each Type-N stat tile shows the basis-touching count in parentheses.
 
     :param session_db: Open :class:`~codeecho.db.SessionDB` context.
     :param result: Summary statistics from the scan.
     :param output_path: Destination HTML file path.
+    :param basis_files: Resolved ``--basis`` file paths, or ``None`` when unused.
     :returns: The resolved path of the written file.
     :since: 1.0.0
     """
     groups = session_db.get_clone_groups(result.session_id)
+    groups_with_members = [(g, session_db.get_fragments_for_group(g)) for g in groups]
+
     groups_by_type: dict[int, list[dict]] = {1: [], 2: [], 3: []}
-    for group in groups:
-        members = session_db.get_fragments_for_group(group)
-        entry = {"group": group, "members": members}
-        groups_by_type[group.clone_type].append(entry)
+    if basis_files is not None:
+        for group, members, basis_internal in basis_module.filter_groups_for_basis(
+            groups_with_members, basis_files
+        ):
+            entry = {
+                "group": group,
+                "members": members,
+                "basis_internal": basis_internal,
+            }
+            groups_by_type[group.clone_type].append(entry)
+    else:
+        for group, members in groups_with_members:
+            entry = {"group": group, "members": members, "basis_internal": False}
+            groups_by_type[group.clone_type].append(entry)
 
     env = Environment(loader=BaseLoader(), autoescape=True)  # type: ignore[call-arg]
     tmpl = env.from_string(_TEMPLATE)
     html = tmpl.render(
         result=result,
         groups_by_type=groups_by_type,
+        basis_files=basis_files,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
     )
 

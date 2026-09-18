@@ -29,6 +29,7 @@ from rich.progress import (
 from rich.table import Table
 
 from . import __version__, CONF_DIR, DEFAULT_IGNORE_PATH
+from . import basis as basis_module
 from . import extractor, fingerprint, parser as ts_parser, scanner
 from .config import Config
 from .db import SessionDB, get_db_path
@@ -135,6 +136,26 @@ def _resolve_target_paths(
     return expanded
 
 
+def _read_basis_targets(basis_path: Path | None) -> list[Path]:
+    """Read the basis path(s) listed in *basis_path*, if given.
+
+    Absolute entries are resolved (normalising case/symlinks); relative entries
+    (e.g. a bare filename) are left as-is so they can be matched by filename/suffix
+    against the scanned files instead of being resolved against the current
+    working directory.
+
+    :since: 1.2.0
+    """
+    if basis_path is None:
+        return []
+    targets = [
+        p.resolve() if p.is_absolute() else p for p in _read_target_list(basis_path)
+    ]
+    if not targets:
+        raise click.UsageError("--basis file contains no target paths.")
+    return targets
+
+
 def _discover_files(
     resolved: list[Path], exclude: tuple[str, ...]
 ) -> list[tuple[Path, str]]:
@@ -235,6 +256,22 @@ def _discover_files(
         "arguments. Blank lines and lines starting with '#' are skipped."
     ),
 )
+@click.option(
+    "--basis",
+    "basis_path",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    metavar="FILE",
+    help=(
+        "File listing basis target paths, one per line, same format as "
+        "--target-list. Absolute file/directory entries are added to the scan "
+        "automatically and matched exactly; relative entries (e.g. a bare "
+        "filename) are matched by filename/suffix against any file discovered "
+        "in the scan. The report is filtered to only clone groups that touch "
+        "at least one basis file; groups duplicated purely among basis files "
+        "are flagged as such."
+    ),
+)
 def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,invalid-name
     paths: tuple[Path, ...],
     types: str,
@@ -246,6 +283,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
     min_tokens: int,
     exclude: tuple[str, ...],
     target_list: bool,
+    basis_path: Path | None,
 ) -> None:
     """Scan one or more PATH(s) for duplicate and near-duplicate code.
 
@@ -267,14 +305,20 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
         output_dir = Path.cwd() / "reports"
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    basis_targets = _read_basis_targets(basis_path)
+
     session_id = str(uuid.uuid4())
     config = {
         "types": types,
         "threshold": threshold,
         "min_tokens": min_tokens,
         "exclude": list(exclude),
+        "basis": [str(p) for p in basis_targets],
     }
     resolved = [p.resolve() for p in paths]
+    for target in basis_targets:
+        if target.is_absolute() and target not in resolved:
+            resolved.append(target)
 
     db_path = Path(get_db_path(str(db_dir) if db_dir else None))
     with SessionDB(db_path=db_path) as session_db:
@@ -289,11 +333,29 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
             session_db.delete_session(session_id)
             return
 
+        basis_files = None
+        if basis_targets:
+            basis_files = basis_module.resolve_basis_files(files, basis_targets)
+            if not basis_files:
+                _console.print(
+                    "[yellow]Warning: none of the --basis paths matched any scanned files.[/yellow]"
+                )
+
         total_fragments = _process_files(files, session_db, session_id, min_tokens)
 
         cnt1, cnt2, cnt3 = _detect_clones(
             session_db, session_id, detect_types, threshold
         )
+
+        basis_counts = {1: 0, 2: 0, 3: 0}
+        if basis_files is not None:
+            groups = session_db.get_clone_groups(session_id)
+            groups_with_members = [
+                (g, session_db.get_fragments_for_group(g)) for g in groups
+            ]
+            basis_counts = basis_module.count_basis_groups_by_type(
+                groups_with_members, basis_files
+            )
 
         result = ScanResult(
             session_id=session_id,
@@ -304,9 +366,15 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
             type1_groups=cnt1,
             type2_groups=cnt2,
             type3_groups=cnt3,
+            basis_paths=[str(p) for p in basis_targets],
+            basis_type1_groups=basis_counts[1],
+            basis_type2_groups=basis_counts[2],
+            basis_type3_groups=basis_counts[3],
         )
 
-        written = _write_reports(session_db, result, output_dir, output, fmt)
+        written = _write_reports(
+            session_db, result, output_dir, output, fmt, basis_files
+        )
 
         session_db.delete_session(session_id)
 
@@ -328,12 +396,13 @@ def _detect_clones(
     return detect(session_db, session_id, detect_types, threshold)
 
 
-def _write_reports(
+def _write_reports(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     session_db: SessionDB,
     result: ScanResult,
     output_dir: Path,
     output: str,
     fmt: str,
+    basis_files: frozenset[str] | None = None,
 ) -> list[Path]:
     """Write the requested report formats and return a list of written paths.
 
@@ -342,11 +411,15 @@ def _write_reports(
     written: list[Path] = []
     if fmt in ("json", "both"):
         written.append(
-            json_reporter.write(session_db, result, output_dir / f"{output}.json")
+            json_reporter.write(
+                session_db, result, output_dir / f"{output}.json", basis_files
+            )
         )
     if fmt in ("html", "both"):
         written.append(
-            html_reporter.write(session_db, result, output_dir / f"{output}.html")
+            html_reporter.write(
+                session_db, result, output_dir / f"{output}.html", basis_files
+            )
         )
     return written
 
@@ -356,19 +429,31 @@ def _print_summary(result: ScanResult, written: list[Path]) -> None:
 
     :since: 1.0.0
     """
+    has_basis = bool(result.basis_paths)
+
+    def _value(count: int, basis_count: int) -> str:
+        return f"{count} ({basis_count})" if has_basis else str(count)
+
     table = Table(title="Scan Summary", show_header=True, header_style="bold magenta")
     table.add_column("Metric", style="dim", min_width=26)
     table.add_column("Value", justify="right", style="bold")
     table.add_row("Files scanned", str(result.files_scanned))
     table.add_row("Fragments extracted", str(result.fragments_extracted))
-    table.add_row("[red]Type-1[/red] clone groups (exact)", str(result.type1_groups))
     table.add_row(
-        "[yellow]Type-2[/yellow] clone groups (structural)", str(result.type2_groups)
+        "[red]Type-1[/red] clone groups (exact)",
+        _value(result.type1_groups, result.basis_type1_groups),
     )
     table.add_row(
-        "[green]Type-3[/green] clone groups (near-duplicate)", str(result.type3_groups)
+        "[yellow]Type-2[/yellow] clone groups (structural)",
+        _value(result.type2_groups, result.basis_type2_groups),
+    )
+    table.add_row(
+        "[green]Type-3[/green] clone groups (near-duplicate)",
+        _value(result.type3_groups, result.basis_type3_groups),
     )
     _console.print(table)
+    if has_basis:
+        _console.print("[dim]Value in parentheses = basis-touching groups.[/dim]")
     _console.print("\n[bold]Reports saved:[/bold]")
     for dest in written:
         _console.print(f"  [cyan]•[/cyan] {dest}")

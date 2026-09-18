@@ -168,6 +168,155 @@ def test_target_list_empty_file_exits_with_error(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# --basis option
+# ---------------------------------------------------------------------------
+
+
+def test_basis_targets_merged_into_scan(tmp_path):
+    """--basis paths not already in PATH are added to the scan automatically."""
+    scan_dir = tmp_path / "src"
+    scan_dir.mkdir()
+    basis_dir = tmp_path / "reference"
+    basis_dir.mkdir()
+    basis_list = tmp_path / "basis.txt"
+    basis_list.write_text(f"{basis_dir}\n", encoding="utf-8")
+    db_dir = tmp_path / "db"
+    runner = CliRunner()
+    with patch("codeecho.__main__.scanner.scan", return_value=[]) as mock_scan:
+        result = runner.invoke(
+            main, [str(scan_dir), "--basis", str(basis_list), "--db-dir", str(db_dir)]
+        )
+    assert result.exit_code == 0
+    scanned_paths = mock_scan.call_args[0][0]
+    assert scan_dir.resolve() in scanned_paths
+    assert basis_dir.resolve() in scanned_paths
+
+
+def test_basis_empty_file_exits_with_error(tmp_path):
+    """--basis file with no real entries exits with a usage error."""
+    scan_dir = tmp_path / "src"
+    scan_dir.mkdir()
+    basis_list = tmp_path / "basis.txt"
+    basis_list.write_text("# just a comment\n\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(main, [str(scan_dir), "--basis", str(basis_list)])
+    assert result.exit_code != 0
+    assert "no target paths" in result.output
+
+
+def test_basis_rejects_missing_file(tmp_path):
+    """--basis requires the given path to exist."""
+    scan_dir = tmp_path / "src"
+    scan_dir.mkdir()
+    runner = CliRunner()
+    result = runner.invoke(
+        main, [str(scan_dir), "--basis", str(tmp_path / "missing.txt")]
+    )
+    assert result.exit_code != 0
+
+
+def test_basis_relative_entry_not_merged_into_scan(tmp_path):
+    """A relative --basis entry (e.g. a bare filename) is not treated as a scan root."""
+    scan_dir = tmp_path / "src"
+    scan_dir.mkdir()
+    basis_list = tmp_path / "basis.txt"
+    basis_list.write_text("SomeFile.gs\n", encoding="utf-8")
+    db_dir = tmp_path / "db"
+    runner = CliRunner()
+    with patch("codeecho.__main__.scanner.scan", return_value=[]) as mock_scan:
+        result = runner.invoke(
+            main, [str(scan_dir), "--basis", str(basis_list), "--db-dir", str(db_dir)]
+        )
+    assert result.exit_code == 0
+    scanned_paths = mock_scan.call_args[0][0]
+    assert scanned_paths == (scan_dir.resolve(),)
+
+
+def test_basis_relative_entry_matches_file_anywhere_in_scan(tmp_path):
+    """A relative --basis entry matches a same-named file discovered anywhere in the scan."""
+    scan_dir = tmp_path / "src"
+    nested_dir = scan_dir / "nested"
+    nested_dir.mkdir(parents=True)
+    target_file = nested_dir / "IInfuser.gs"
+    target_file.write_text("class IInfuser {}\n", encoding="utf-8")
+    other_file = scan_dir / "Other.gs"
+    other_file.write_text("class Other {}\n", encoding="utf-8")
+    basis_list = tmp_path / "basis.txt"
+    basis_list.write_text("IInfuser.gs\n", encoding="utf-8")
+    db_dir = tmp_path / "db"
+
+    captured = {}
+
+    def fake_write_reports(
+        session_db, result, output_dir, output, fmt, basis_files=None
+    ):  # pylint: disable=too-many-arguments,unused-argument
+        captured["basis_files"] = basis_files
+        return []
+
+    runner = CliRunner()
+    with patch("codeecho.__main__._write_reports", side_effect=fake_write_reports):
+        result = runner.invoke(
+            main, [str(scan_dir), "--basis", str(basis_list), "--db-dir", str(db_dir)]
+        )
+    assert result.exit_code == 0
+    assert captured["basis_files"] == frozenset({str(target_file.resolve())})
+
+
+def test_basis_warns_when_no_overlap_with_scanned_files(tmp_path):
+    """A warning is printed when no scanned file falls under any --basis path."""
+    scan_dir = tmp_path / "src"
+    scan_dir.mkdir()
+    (scan_dir / "a.py").write_text("def foo():\n    pass\n", encoding="utf-8")
+    basis_dir = tmp_path / "unrelated"
+    basis_dir.mkdir()
+    basis_list = tmp_path / "basis.txt"
+    basis_list.write_text(f"{basis_dir}\n", encoding="utf-8")
+    db_dir = tmp_path / "db"
+    runner = CliRunner()
+    result = runner.invoke(
+        main, [str(scan_dir), "--basis", str(basis_list), "--db-dir", str(db_dir)]
+    )
+    assert result.exit_code == 0
+    assert "none of the --basis paths matched" in result.output
+
+
+def test_basis_files_passed_to_report_writers(tmp_path):
+    """Resolved basis files are threaded through to the report writers."""
+    scan_dir = tmp_path / "scan"
+    scan_dir.mkdir()
+    basis_dir = tmp_path / "basis"
+    basis_dir.mkdir()
+    basis_file = basis_dir / "a.py"
+    basis_file.write_text("def foo():\n    pass\n", encoding="utf-8")
+    other_file = scan_dir / "b.py"
+    other_file.write_text("def bar():\n    pass\n", encoding="utf-8")
+    basis_list = tmp_path / "basis.txt"
+    basis_list.write_text(f"{basis_dir}\n", encoding="utf-8")
+    db_dir = tmp_path / "db"
+
+    discovered = [(basis_file.resolve(), "Python"), (other_file.resolve(), "Python")]
+    captured = {}
+
+    def fake_write_reports(
+        session_db, result, output_dir, output, fmt, basis_files=None
+    ):  # pylint: disable=too-many-arguments,unused-argument
+        captured["basis_files"] = basis_files
+        return []
+
+    runner = CliRunner()
+    with (
+        patch("codeecho.__main__.scanner.scan", return_value=discovered),
+        patch("codeecho.__main__._write_reports", side_effect=fake_write_reports),
+    ):
+        result = runner.invoke(
+            main,
+            [str(scan_dir), "--basis", str(basis_list), "--db-dir", str(db_dir)],
+        )
+    assert result.exit_code == 0
+    assert captured["basis_files"] == frozenset({str(basis_file.resolve())})
+
+
+# ---------------------------------------------------------------------------
 # _load_ignore_file / _build_ignore (config.ini override support)
 # ---------------------------------------------------------------------------
 
