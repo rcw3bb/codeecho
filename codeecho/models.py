@@ -51,3 +51,7 @@ class ScanResult:  # pylint: disable=too-many-instance-attributes
     type1_groups: int
     type2_groups: int
     type3_groups: int
+    basis_paths: list[str] = field(default_factory=list)
+    basis_type1_groups: int = 0
+    basis_type2_groups: int = 0
+    basis_type3_groups: int = 0

@@ -87,3 +87,69 @@ def test_html_contains_source(session_db, session_id, tmp_path):
     html_reporter.write(session_db, result, out)
     content = out.read_text(encoding="utf-8")
     assert "def foo" in content or "def foo" in content
+
+
+def test_html_report_no_basis_omits_badges(session_db, session_id, tmp_path):
+    """Without basis_files, no basis badge/chip markup is rendered."""
+    _seed_db(session_db, session_id)
+    result = ScanResult(
+        session_id=session_id,
+        version="1.0.0",
+        scan_path=["/src"],
+        files_scanned=2,
+        fragments_extracted=2,
+        type1_groups=1,
+        type2_groups=0,
+        type3_groups=0,
+    )
+    out = tmp_path / "report.html"
+    html_reporter.write(session_db, result, out)
+    content = out.read_text(encoding="utf-8")
+    assert '<span class="basis-badge"' not in content
+    assert '<span class="basis-chip"' not in content
+    assert '<span class="basis-count"' not in content
+
+
+def test_html_report_basis_internal_group_gets_badge(session_db, session_id, tmp_path):
+    """A group whose members are all basis files renders the Basis-to-Basis badge."""
+    _seed_db(session_db, session_id)
+    result = ScanResult(
+        session_id=session_id,
+        version="1.0.0",
+        scan_path=["/src"],
+        files_scanned=2,
+        fragments_extracted=2,
+        type1_groups=1,
+        type2_groups=0,
+        type3_groups=0,
+        basis_paths=["/src/a.py", "/src/b.py"],
+        basis_type1_groups=1,
+        basis_type2_groups=0,
+        basis_type3_groups=0,
+    )
+    out = tmp_path / "report.html"
+    basis_files = frozenset({"/src/a.py", "/src/b.py"})
+    html_reporter.write(session_db, result, out, basis_files)
+    content = out.read_text(encoding="utf-8")
+    assert "Basis-to-Basis" in content
+    assert content.count('<span class="basis-chip">') == 2
+    assert '<span class="basis-count">(1)</span>' in content
+
+
+def test_html_report_basis_drops_non_basis_groups(session_db, session_id, tmp_path):
+    """Groups with no basis-file member are excluded from the rendered report."""
+    _seed_db(session_db, session_id)
+    result = ScanResult(
+        session_id=session_id,
+        version="1.0.0",
+        scan_path=["/src"],
+        files_scanned=2,
+        fragments_extracted=2,
+        type1_groups=1,
+        type2_groups=0,
+        type3_groups=0,
+    )
+    out = tmp_path / "report.html"
+    html_reporter.write(session_db, result, out, frozenset({"/other/x.py"}))
+    content = out.read_text(encoding="utf-8")
+    assert "No Type-1" in content

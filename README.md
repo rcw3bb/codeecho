@@ -58,6 +58,7 @@ python -m codeecho <path> [options]
 | `--min-tokens <n>` | `10` | Minimum token count for a code fragment to be included. |
 | `--exclude <pattern>` | _(none)_ | Glob pattern(s) to exclude from scanning (repeatable). |
 | `--target-list` | `false` | Treat `PATH` as a single existing file listing target paths (files and/or directories), one per line, instead of individual `PATH` arguments. Blank lines and lines starting with `#` are skipped. |
+| `--basis <file>` | _(none)_ | File listing basis target paths, one per line — same format as `--target-list`. Absolute file/directory entries are merged into the scan automatically and matched exactly; relative entries (e.g. a bare filename like `Foo.gs`) are matched by filename/suffix against any file discovered in the scan. The report is filtered to only clone groups touching at least one basis file, and groups duplicated purely among basis files are flagged (`basis_internal` in JSON, a "Basis-to-Basis" badge in HTML). |
 | `--version` | | Print the version and exit. |
 | `-h, --help` | | Show help and exit. |
 
@@ -97,6 +98,12 @@ Scan targets listed in a file, one path per line:
 
 ```powershell
 python -m codeecho targets.txt --target-list
+```
+
+Find where code from a reference/basis set of files is duplicated elsewhere in the codebase:
+
+```powershell
+python -m codeecho src --basis basis.txt
 ```
 
 ## Configuration

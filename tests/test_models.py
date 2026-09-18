@@ -46,3 +46,42 @@ def test_scan_result_fields():
     )
     assert result.files_scanned == 5
     assert result.type1_groups + result.type2_groups + result.type3_groups == 6
+    assert result.basis_paths == []
+    assert result.basis_type1_groups == 0
+    assert result.basis_type2_groups == 0
+    assert result.basis_type3_groups == 0
+
+
+def test_scan_result_basis_paths():
+    result = ScanResult(
+        session_id="s1",
+        version="1.0.0",
+        scan_path=["/root"],
+        files_scanned=1,
+        fragments_extracted=1,
+        type1_groups=0,
+        type2_groups=0,
+        type3_groups=0,
+        basis_paths=["/root/basis.py"],
+    )
+    assert result.basis_paths == ["/root/basis.py"]
+
+
+def test_scan_result_basis_type_counts():
+    result = ScanResult(
+        session_id="s1",
+        version="1.0.0",
+        scan_path=["/root"],
+        files_scanned=1,
+        fragments_extracted=1,
+        type1_groups=2,
+        type2_groups=1,
+        type3_groups=0,
+        basis_paths=["/root/basis.py"],
+        basis_type1_groups=1,
+        basis_type2_groups=1,
+        basis_type3_groups=0,
+    )
+    assert result.basis_type1_groups == 1
+    assert result.basis_type2_groups == 1
+    assert result.basis_type3_groups == 0
