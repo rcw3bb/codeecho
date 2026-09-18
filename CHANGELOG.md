@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.1 - 2026-09-19
+
+### Changed
+
+- Packaging metadata updated for publishing to PyPI: added `keywords`, `classifiers`,
+  and `[project.urls]` (Homepage, Repository, Documentation, Bug Tracker, Changelog).
+- License declared via the SPDX `license = "MIT"` string with `license-files = ["LICENSE"]`
+  instead of the deprecated `{file = "LICENSE"}` table, and the redundant MIT classifier
+  was dropped.
+- The `codeecho` console entry point moved from `[tool.poetry.scripts]` to `[project.scripts]`.
+
 ## 1.2.0 - 2026-09-18
 
 ### Added

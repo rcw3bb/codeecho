@@ -1,13 +1,26 @@
 [project]
 name = "codeecho"
-version = "1.2.0"
+version = "1.2.1"
 description = "A developer tool that scans your codebase to detect and highlight ECHOES of duplicated or near-duplicated code so you can refactor toward cleaner, more maintainable designs."
 authors = [
     {name = "Ron Webb"}
 ]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.14"
+keywords = ["code-duplication", "clone-detection", "refactoring", "static-analysis", "tree-sitter"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Libraries",
+]
+scripts = {codeecho = "codeecho.__main__:main"}
 dependencies = [
     "logenrich (>=1.0.1,<2.0.0)",
     "env-dir-bootstrap (>=1.1.0,<2.0.0)",
@@ -24,6 +37,12 @@ dependencies = [
     "tree-sitter-gosu (>=0.2.0,<0.3.0)"
 ]
 
+[project.urls]
+Homepage = "https://github.com/rcw3bb/codeecho"
+Repository = "https://github.com/rcw3bb/codeecho"
+Documentation = "https://github.com/rcw3bb/codeecho#readme"
+Issues = "https://github.com/rcw3bb/codeecho/issues"
+Changelog = "https://github.com/rcw3bb/codeecho/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -31,10 +50,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [{include = "codeecho"}]
-include = ["codeecho/logging.ini", "codeecho/.ignore", "codeecho/config.ini", "CHANGELOG.md"]
-
-[tool.poetry.scripts]
-codeecho = "codeecho.__main__:main"
+include = ["codeecho/logging.ini", "codeecho/.ignore", "codeecho/config.ini", "CHANGELOG.md", "LICENSE"]
 
 [dependency-groups]
 dev = [

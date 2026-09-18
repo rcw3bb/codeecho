@@ -1,6 +1,6 @@
-# codeecho 1.2.0
+# codeecho
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/rcw3bb/codeecho/blob/main/LICENSE) [![Version](https://img.shields.io/badge/Version-1.2.0-green.svg)](https://github.com/rcw3bb/codeecho/blob/main/CHANGELOG.md) [![Python](https://img.shields.io/badge/Python-3.14%2B-blue)](https://www.python.org/) [![PyPI](https://img.shields.io/badge/PyPI-codeecho-orange)](https://pypi.org/project/codeecho/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/rcw3bb/codeecho/blob/main/LICENSE) [![Version](https://img.shields.io/badge/Version-1.2.1-green.svg)](https://github.com/rcw3bb/codeecho/blob/main/CHANGELOG.md) [![Python](https://img.shields.io/badge/Python-3.14%2B-blue)](https://www.python.org/) [![PyPI](https://img.shields.io/badge/PyPI-codeecho-orange)](https://pypi.org/project/codeecho/)
 
 > A developer tool that scans your codebase to detect and highlight **echoes** of duplicated or near-duplicated code, so you can refactor toward cleaner, more maintainable designs.
 
