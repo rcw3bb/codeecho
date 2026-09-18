@@ -4,9 +4,13 @@ CLI entry point for codeecho.
 Invoked via::
 
     poetry run python -m codeecho [OPTIONS] PATH
+
+:author: Ron Webb
+:since: 1.0.0
 """
 
 import json
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -24,20 +28,26 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from codeecho import __version__, CONF_DIR
-from codeecho import extractor, fingerprint, parser as ts_parser, scanner
-from codeecho.db import SessionDB, get_db_path
-from codeecho.detector import detect
-from codeecho.models import ScanResult
-from codeecho.reporter import html_reporter, json_reporter
+from . import __version__, CONF_DIR, DEFAULT_IGNORE_PATH
+from . import extractor, fingerprint, parser as ts_parser, scanner
+from .config import Config
+from .db import SessionDB, get_db_path
+from .detector import detect
+from .models import ScanResult
+from .reporter import html_reporter, json_reporter
 
 _console = Console()
+_config = Config()
+_logger = logging.getLogger("codeecho.__main__")
 
 _FORMAT_CHOICES = click.Choice(["json", "html", "both"])
 
 
 def _parse_types(types_str: str) -> set[int]:
-    """Parse ``--types`` value into a set of integers."""
+    """Parse ``--types`` value into a set of integers.
+
+    :since: 1.0.0
+    """
     if types_str.strip().lower() == "all":
         return {1, 2, 3}
     result: set[int] = set()
@@ -50,6 +60,100 @@ def _parse_types(types_str: str) -> set[int]:
             f"Invalid types value: {types_str!r}. Use 'all' or e.g. '1,2,3'."
         )
     return result
+
+
+def _read_target_list(list_file: Path) -> list[Path]:
+    """Read one target path per line from *list_file*.
+
+    Blank lines and lines starting with ``#`` are skipped.
+
+    :since: 1.2.0
+    """
+    result: list[Path] = []
+    for line in list_file.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            result.append(Path(stripped))
+    return result
+
+
+def _load_ignore_file(ignore_path: Path, base_dir: Path) -> IgnoreFile | None:
+    """Load an :class:`IgnoreFile` from *ignore_path*, logging failures.
+
+    Returns ``None`` on a missing or non-UTF-8 file instead of raising.
+
+    :since: 1.2.0
+    """
+    try:
+        return IgnoreFile(ignore_path, base_dir=base_dir)
+    except FileNotFoundError:
+        _logger.warning("Ignore file not found at %s", ignore_path)
+        return None
+    except UnicodeDecodeError as exc:
+        _logger.warning("Ignore file at %s is not valid UTF-8: %s", ignore_path, exc)
+        return None
+
+
+def _build_ignore(base_dir: Path) -> IgnoreFile | None:
+    """Build a path-ignore matcher anchored at *base_dir*.
+
+    The ignore filename is resolved from ``config.ini``'s ``[override]
+    ignore-file`` setting under :data:`CONF_DIR`; when that file is missing,
+    the bundled default ``.ignore`` is tried instead.
+
+    :since: 1.2.0
+    """
+    custom_path = Path(CONF_DIR) / _config.get_ignore_file()
+    ignore = _load_ignore_file(custom_path, base_dir)
+    if ignore is not None:
+        return ignore
+    if custom_path == Path(DEFAULT_IGNORE_PATH):
+        return None
+    return _load_ignore_file(Path(DEFAULT_IGNORE_PATH), base_dir)
+
+
+def _resolve_target_paths(
+    paths: tuple[Path, ...], target_list: bool
+) -> tuple[Path, ...]:
+    """Validate *paths* and expand ``--target-list`` into concrete target paths.
+
+    :since: 1.2.0
+    """
+    if not paths:
+        raise click.UsageError("At least one PATH is required.")
+
+    if not target_list:
+        return paths
+
+    if len(paths) != 1 or not paths[0].is_file():
+        raise click.UsageError(
+            "--target-list requires PATH to be a single existing file."
+        )
+    expanded = tuple(_read_target_list(paths[0]))
+    if not expanded:
+        raise click.UsageError("--target-list file contains no target paths.")
+    return expanded
+
+
+def _discover_files(
+    resolved: list[Path], exclude: tuple[str, ...]
+) -> list[tuple[Path, str]]:
+    """Print scan targets and return the discovered ``(file, language)`` pairs.
+
+    :since: 1.2.0
+    """
+    for target_path in resolved:
+        _console.print(f"[dim]Scanning:[/dim] [bold]{target_path}[/bold]")
+    try:
+        base_dir = Path(os.path.commonpath(resolved))
+        if not base_dir.is_dir():
+            base_dir = base_dir.parent
+    except ValueError:
+        base_dir = Path.cwd()
+    ignore_file = _build_ignore(base_dir)
+    return scanner.scan(
+        tuple(resolved), exclude_patterns=exclude, ignore_file=ignore_file
+    )
 
 
 @click.command(
@@ -120,6 +224,17 @@ def _parse_types(types_str: str) -> set[int]:
     metavar="PATTERN",
     help="Glob pattern(s) to exclude from scanning (repeatable).",
 )
+@click.option(
+    "--target-list",
+    "target_list",
+    is_flag=True,
+    default=False,
+    help=(
+        "Treat PATH as a single existing file listing target paths (files "
+        "and/or directories), one per line, instead of individual PATH "
+        "arguments. Blank lines and lines starting with '#' are skipped."
+    ),
+)
 def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,invalid-name
     paths: tuple[Path, ...],
     types: str,
@@ -130,11 +245,14 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
     fmt: str,
     min_tokens: int,
     exclude: tuple[str, ...],
+    target_list: bool,
 ) -> None:
     """Scan one or more PATH(s) for duplicate and near-duplicate code.
 
     Each PATH may be a file or a directory.  Generates JSON and/or HTML reports,
     then removes the intermediate session data from the embedded database.
+
+    :since: 1.0.0
     """
     _console.print(
         Panel(
@@ -143,12 +261,12 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
         )
     )
 
-    if not paths:
-        raise click.UsageError("At least one PATH is required.")
-
+    paths = _resolve_target_paths(paths, target_list)
     detect_types = _parse_types(types)
     if output_dir is None:
         output_dir = Path.cwd() / "reports"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     session_id = str(uuid.uuid4())
     config = {
         "types": types,
@@ -156,9 +274,6 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
         "min_tokens": min_tokens,
         "exclude": list(exclude),
     }
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     resolved = [p.resolve() for p in paths]
 
     db_path = Path(get_db_path(str(db_dir) if db_dir else None))
@@ -167,30 +282,15 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
             session_id, json.dumps([str(p) for p in resolved]), config
         )
 
-        # ── Phase 1: File discovery ─────────────────────────────────────────
-        for p in resolved:
-            _console.print(f"[dim]Scanning:[/dim] [bold]{p}[/bold]")
-        try:
-            base_dir = Path(os.path.commonpath(resolved))
-            if not base_dir.is_dir():
-                base_dir = base_dir.parent
-        except ValueError:
-            base_dir = Path.cwd()
-        _ignore_file = IgnoreFile(Path(CONF_DIR) / ".ignore", base_dir=base_dir)
-        files = scanner.scan(
-            tuple(resolved), exclude_patterns=exclude, ignore_file=_ignore_file
-        )
-        total_fragments = 0
+        files = _discover_files(resolved, exclude)
 
         if not files:
             _console.print("[yellow]No supported source files found.[/yellow]")
             session_db.delete_session(session_id)
             return
 
-        # ── Phase 2: Parse → Extract → Hash ────────────────────────────────
         total_fragments = _process_files(files, session_db, session_id, min_tokens)
 
-        # ── Phase 3: Clone detection ────────────────────────────────────────
         cnt1, cnt2, cnt3 = _detect_clones(
             session_db, session_id, detect_types, threshold
         )
@@ -206,10 +306,8 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
             type3_groups=cnt3,
         )
 
-        # ── Phase 4: Report generation ──────────────────────────────────────
         written = _write_reports(session_db, result, output_dir, output, fmt)
 
-        # ── Phase 5: Clean up session ───────────────────────────────────────
         session_db.delete_session(session_id)
 
     # ── Summary table (printed after DB is closed) ──────────────────────────
@@ -222,7 +320,10 @@ def _detect_clones(
     detect_types: set[int],
     threshold: float,
 ) -> tuple[int, int, int]:
-    """Run clone detection and return (type1_count, type2_count, type3_count)."""
+    """Run clone detection and return (type1_count, type2_count, type3_count).
+
+    :since: 1.0.0
+    """
     _console.print("[dim]Detecting clones…[/dim]")
     return detect(session_db, session_id, detect_types, threshold)
 
@@ -234,7 +335,10 @@ def _write_reports(
     output: str,
     fmt: str,
 ) -> list[Path]:
-    """Write the requested report formats and return a list of written paths."""
+    """Write the requested report formats and return a list of written paths.
+
+    :since: 1.0.0
+    """
     written: list[Path] = []
     if fmt in ("json", "both"):
         written.append(
@@ -248,7 +352,10 @@ def _write_reports(
 
 
 def _print_summary(result: ScanResult, written: list[Path]) -> None:
-    """Print the scan summary table and list of saved report paths."""
+    """Print the scan summary table and list of saved report paths.
+
+    :since: 1.0.0
+    """
     table = Table(title="Scan Summary", show_header=True, header_style="bold magenta")
     table.add_column("Metric", style="dim", min_width=26)
     table.add_column("Value", justify="right", style="bold")
@@ -277,6 +384,8 @@ def _process_files(
 
     Returns:
         Total number of fragments extracted.
+
+    :since: 1.0.0
     """
     total = 0
     with Progress(

@@ -15,8 +15,8 @@ from pathlib import Path
 
 from jinja2 import BaseLoader, Environment
 
-from codeecho.db import SessionDB
-from codeecho.models import ScanResult
+from ..db import SessionDB
+from ..models import ScanResult
 
 _logger = logging.getLogger("codeecho.reporter.html")
 
@@ -190,6 +190,7 @@ def write(
     :param result: Summary statistics from the scan.
     :param output_path: Destination HTML file path.
     :returns: The resolved path of the written file.
+    :since: 1.0.0
     """
     groups = session_db.get_clone_groups(result.session_id)
     groups_by_type: dict[int, list[dict]] = {1: [], 2: [], 3: []}

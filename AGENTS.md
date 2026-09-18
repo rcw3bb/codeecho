@@ -6,7 +6,8 @@
 
 - codeecho/ — main package source code
 - codeecho/__init__.py — package entry point; bootstraps config dir and logger
-- codeecho/__main__.py — Click CLI entry point (--version, --types, --threshold, --output, --format, --min-tokens, --exclude); Rich progress bar and summary table
+- codeecho/__main__.py — Click CLI entry point (--version, --types, --threshold, --output, --format, --min-tokens, --exclude, --target-list); Rich progress bar and summary table
+- codeecho/config.py — Config class reading config.ini `[override] ignore-file` (falls back to `.ignore`)
 - codeecho/models.py — Fragment, CloneGroup, ScanResult dataclasses
 - codeecho/db.py — SessionDB context manager; SQLite session store (schema, CRUD, cascade delete)
 - codeecho/scanner.py — File discovery (walk, extension→language map, .gitignore-like exclusions)
@@ -20,10 +21,13 @@
 - codeecho/reporter/json_reporter.py — JSON report writer (reads session DB)
 - codeecho/reporter/html_reporter.py — Self-contained HTML report via Jinja2 inline template
 - codeecho/logging.ini — logging configuration (bundled with the package)
+- codeecho/config.ini — bundled default config; `[override] ignore-file = .ignore`
 - tests/ — pytest test suite mirroring the codeecho/ structure
 - tests/conftest.py — shared fixtures (session_db, session_id)
 - tests/test_models.py — Fragment / CloneGroup / ScanResult model tests
 - tests/test_db.py — SessionDB CRUD + cascade delete tests
+- tests/test_main.py — CLI tests (--db-dir, multi-path, --target-list, ignore-file config override)
+- tests/test_config.py — Config `[override] ignore-file` fallback/override tests
 - tests/test_scanner.py — file discovery and exclusion tests
 - tests/test_parser.py — tree-sitter grammar loading + parse tests
 - tests/test_normalizer.py — token extraction and normalisation tests
@@ -48,6 +52,8 @@
 - Follow DRY: extract shared logic into utilities; never duplicate business logic.
 - Prefer composition over inheritance: build behavior by composing small, focused units.
 - Use modern Python syntax: type hints, dataclasses, f-strings, `match` statements, and walrus operator where appropriate.
+- Use relative imports within the `codeecho` package (`from . import x`, `from ..module import y`) — never absolute `from codeecho...` imports.
+- Every docstring (module, class, function, method) that exists must include a `:since: <version>` field giving the version it was first introduced in (cross-check CHANGELOG.md / `git log -S"def <name>("` against tag dates — uncommitted/staged code belongs to the current unreleased `pyproject.toml` version). Module and public top-level class docstrings must also include `:author: Ron Webb`. Functions/methods with no docstring at all are not required to gain one just for this.
 - Max line length is 120 characters (enforced by pylint and black).
 - Place all new tests in tests/ mirroring the codeecho/ package structure.
 - All new code must achieve pylint 10.00/10 before committing.

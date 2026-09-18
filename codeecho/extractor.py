@@ -60,7 +60,10 @@ _FRAGMENT_TYPES: tuple[str, ...] = ("function", "class", "file")
 
 
 def _get_query(language_name: str, fragment_type: str, lang: Language) -> Query | None:
-    """Return a fresh :class:`tree_sitter.Query` for *language_name* / *fragment_type*."""
+    """Return a fresh :class:`tree_sitter.Query` for *language_name* / *fragment_type*.
+
+    :since: 1.0.0
+    """
     pattern = _QUERIES.get((language_name, fragment_type))
     if pattern is None:
         return None
@@ -90,6 +93,7 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
     :param session_id: UUID of the current scan session.
     :param min_tokens: Fragments with fewer raw tokens are discarded.
     :returns: List of fully-populated :class:`Fragment` objects.
+    :since: 1.0.0
     """
     lang = get_language(language_name)
     if lang is None:

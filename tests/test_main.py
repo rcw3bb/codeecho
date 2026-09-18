@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from codeecho.__main__ import main
+from codeecho.__main__ import _build_ignore, _load_ignore_file, main
 
 # ---------------------------------------------------------------------------
 # --db-dir option
@@ -108,3 +108,123 @@ def test_multiple_paths_are_accepted(tmp_path):
     with patch("codeecho.__main__.scanner.scan", return_value=[]):
         result = runner.invoke(main, [str(dir_a), str(dir_b), "--db-dir", str(db_dir)])
     assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# --target-list option
+# ---------------------------------------------------------------------------
+
+
+def test_target_list_reads_paths_from_file(tmp_path):
+    """--target-list reads one path per line, skipping blanks and comments."""
+    dir_a = tmp_path / "a"
+    dir_b = tmp_path / "b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    list_file = tmp_path / "targets.txt"
+    list_file.write_text(f"{dir_a}\n\n# comment\n{dir_b}\n", encoding="utf-8")
+    db_dir = tmp_path / "db"
+    runner = CliRunner()
+    with patch("codeecho.__main__.scanner.scan", return_value=[]) as mock_scan:
+        result = runner.invoke(
+            main, [str(list_file), "--target-list", "--db-dir", str(db_dir)]
+        )
+    assert result.exit_code == 0
+    scanned_paths = mock_scan.call_args[0][0]
+    assert dir_a.resolve() in scanned_paths
+    assert dir_b.resolve() in scanned_paths
+
+
+def test_target_list_rejects_multiple_paths(tmp_path):
+    """--target-list requires exactly one PATH argument."""
+    f1 = tmp_path / "list1.txt"
+    f2 = tmp_path / "list2.txt"
+    f1.write_text("x\n", encoding="utf-8")
+    f2.write_text("y\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(main, [str(f1), str(f2), "--target-list"])
+    assert result.exit_code != 0
+    assert "single existing file" in result.output
+
+
+def test_target_list_rejects_directory_path(tmp_path):
+    """--target-list requires PATH to be a file, not a directory."""
+    scan_dir = tmp_path / "src"
+    scan_dir.mkdir()
+    runner = CliRunner()
+    result = runner.invoke(main, [str(scan_dir), "--target-list"])
+    assert result.exit_code != 0
+    assert "single existing file" in result.output
+
+
+def test_target_list_empty_file_exits_with_error(tmp_path):
+    """--target-list on a file with no real entries exits with a usage error."""
+    list_file = tmp_path / "targets.txt"
+    list_file.write_text("# just a comment\n\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(main, [str(list_file), "--target-list"])
+    assert result.exit_code != 0
+    assert "no target paths" in result.output
+
+
+# ---------------------------------------------------------------------------
+# _load_ignore_file / _build_ignore (config.ini override support)
+# ---------------------------------------------------------------------------
+
+
+def test_load_ignore_file_missing_returns_none(tmp_path):
+    """A missing ignore file path is reported as None instead of raising."""
+    assert _load_ignore_file(tmp_path / "missing.ignore", tmp_path) is None
+
+
+def test_load_ignore_file_existing_returns_ignore_file(tmp_path):
+    """An existing ignore file path loads successfully."""
+    ignore_path = tmp_path / ".ignore"
+    ignore_path.write_text("*.log\n", encoding="utf-8")
+    result = _load_ignore_file(ignore_path, tmp_path)
+    assert result is not None
+    assert result.is_ignored(tmp_path / "debug.log")
+
+
+def test_build_ignore_uses_custom_filename_from_config(tmp_path):
+    """_build_ignore prefers the filename returned by the config override."""
+    custom_ignore = tmp_path / "custom.ignore"
+    custom_ignore.write_text("*.tmp\n", encoding="utf-8")
+    with (
+        patch("codeecho.__main__.CONF_DIR", str(tmp_path)),
+        patch(
+            "codeecho.__main__._config.get_ignore_file", return_value="custom.ignore"
+        ),
+    ):
+        result = _build_ignore(tmp_path)
+    assert result is not None
+    assert result.is_ignored(tmp_path / "scratch.tmp")
+
+
+def test_build_ignore_falls_back_to_default_when_custom_missing(tmp_path):
+    """_build_ignore falls back to the default ignore file if the custom one is missing."""
+    default_ignore = tmp_path / ".ignore"
+    default_ignore.write_text("*.log\n", encoding="utf-8")
+    with (
+        patch("codeecho.__main__.CONF_DIR", str(tmp_path)),
+        patch("codeecho.__main__.DEFAULT_IGNORE_PATH", str(default_ignore)),
+        patch(
+            "codeecho.__main__._config.get_ignore_file", return_value="missing.ignore"
+        ),
+    ):
+        result = _build_ignore(tmp_path)
+    assert result is not None
+    assert result.is_ignored(tmp_path / "debug.log")
+
+
+def test_build_ignore_returns_none_when_nothing_usable(tmp_path):
+    """_build_ignore returns None when neither the custom nor default ignore file exists."""
+    with (
+        patch("codeecho.__main__.CONF_DIR", str(tmp_path)),
+        patch("codeecho.__main__.DEFAULT_IGNORE_PATH", str(tmp_path / ".ignore")),
+        patch(
+            "codeecho.__main__._config.get_ignore_file", return_value="missing.ignore"
+        ),
+    ):
+        result = _build_ignore(tmp_path)
+    assert result is None

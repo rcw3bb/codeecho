@@ -1,6 +1,6 @@
 [project]
 name = "codeecho"
-version = "1.1.0"
+version = "1.2.0"
 description = "A developer tool that scans your codebase to detect and highlight ECHOES of duplicated or near-duplicated code so you can refactor toward cleaner, more maintainable designs."
 authors = [
     {name = "Ron Webb"}
@@ -31,7 +31,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [{include = "codeecho"}]
-include = ["codeecho/logging.ini", "codeecho/.ignore", "CHANGELOG.md"]
+include = ["codeecho/logging.ini", "codeecho/.ignore", "codeecho/config.ini", "CHANGELOG.md"]
 
 [tool.poetry.scripts]
 codeecho = "codeecho.__main__:main"

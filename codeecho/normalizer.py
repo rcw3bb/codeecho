@@ -429,17 +429,26 @@ _STRING_RE: re.Pattern[str] = re.compile(r"""^["'`0-9]""")
 
 
 def get_profile(language_name: str) -> NormalisationProfile:
-    """Return the :class:`NormalisationProfile` for *language_name*, falling back to empty sets."""
+    """Return the :class:`NormalisationProfile` for *language_name*, falling back to empty sets.
+
+    :since: 1.0.0
+    """
     return _PROFILES.get(language_name, _FALLBACK_PROFILE)
 
 
 def _tokenise_text(text: str) -> list[str]:
-    """Split *text* into a list of raw tokens using :data:`_TOKEN_RE`."""
+    """Split *text* into a list of raw tokens using :data:`_TOKEN_RE`.
+
+    :since: 1.0.0
+    """
     return _TOKEN_RE.findall(text)
 
 
 def _node_text(node: Node, source_bytes: bytes) -> str:
-    """Return the UTF-8 decoded source text for the byte range covered by *node*."""
+    """Return the UTF-8 decoded source text for the byte range covered by *node*.
+
+    :since: 1.0.0
+    """
     return source_bytes[node.start_byte : node.end_byte].decode(
         "utf-8", errors="replace"
     )
@@ -457,6 +466,8 @@ def tokenise_and_normalise(
     Returns:
         Raw token list and normalised token list where identifiers become
         ``ID_N`` and literals become ``LIT_N``.
+
+    :since: 1.0.0
     """
     raw_tokens = _tokenise_text(text)
     keywords = _KEYWORDS.get(language_name, frozenset())
@@ -467,6 +478,8 @@ def extract_tokens(node: Node, source_bytes: bytes) -> list[str]:
     """Return a flat list of raw tokens for the source text covered by *node*.
 
     Uses a regex-based tokeniser on the raw source slice — no tree traversal.
+
+    :since: 1.0.0
     """
     return _tokenise_text(_node_text(node, source_bytes))
 
@@ -484,12 +497,17 @@ def extract_and_normalise(
     Returns:
         Raw token list and normalised token list where identifiers become
         ``ID_N`` and literals become ``LIT_N``.
+
+    :since: 1.0.0
     """
     return tokenise_and_normalise(_node_text(node, source_bytes), language_name)
 
 
 def _normalise(raw_tokens: list[str], keywords: frozenset[str]) -> list[str]:
-    """Build a normalised token list from *raw_tokens* using *keywords* for classification."""
+    """Build a normalised token list from *raw_tokens* using *keywords* for classification.
+
+    :since: 1.0.0
+    """
     norm_tokens: list[str] = []
     id_map: dict[str, str] = {}
     lit_count = 0
@@ -510,10 +528,16 @@ def _normalise(raw_tokens: list[str], keywords: frozenset[str]) -> list[str]:
 
 
 def _is_identifier(token: str) -> bool:
-    """Return True if *token* looks like an identifier (letter/underscore start)."""
+    """Return True if *token* looks like an identifier (letter/underscore start).
+
+    :since: 1.0.0
+    """
     return bool(token) and (token[0].isalpha() or token[0] == "_")
 
 
 def _is_comment(token: str) -> bool:
-    """Return True if *token* is a C-style single-line (``//``) or multi-line (``/* */``) comment."""
+    """Return True if *token* is a C-style single-line (``//``) or multi-line (``/* */``) comment.
+
+    :since: 1.0.0
+    """
     return token.startswith("//") or (token.startswith("/*") and token.endswith("*/"))
