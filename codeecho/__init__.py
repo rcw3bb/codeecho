@@ -10,7 +10,7 @@ maintainable designs.
 from env_dir_bootstrap import EnvDirBootstrap
 from logenrich import setup_logger
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 _bootstrapper = EnvDirBootstrap(
     env_var="CODEECHO_CONFIG_DIR",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2 - 2026-09-23
+
+### Changed
+
+- Updated the `braincraft` dependency from 1.2.0 to 1.3.1.
+
 ## 1.2.1 - 2026-09-19
 
 ### Changed
