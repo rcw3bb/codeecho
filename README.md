@@ -1,6 +1,6 @@
 # codeecho
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/rcw3bb/codeecho/blob/main/LICENSE) [![Version](https://img.shields.io/badge/Version-1.2.2-green.svg)](https://github.com/rcw3bb/codeecho/blob/main/CHANGELOG.md) [![Python](https://img.shields.io/badge/Python-3.14%2B-blue)](https://www.python.org/) [![PyPI](https://img.shields.io/badge/PyPI-codeecho-orange)](https://pypi.org/project/codeecho/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/rcw3bb/codeecho/blob/main/LICENSE) [![Version](https://img.shields.io/badge/Version-1.2.3-green.svg)](https://github.com/rcw3bb/codeecho/blob/main/CHANGELOG.md) [![Python](https://img.shields.io/badge/Python-3.14%2B-blue)](https://www.python.org/) [![PyPI](https://img.shields.io/badge/PyPI-codeecho-orange)](https://pypi.org/project/codeecho/)
 
 > A developer tool that scans your codebase to detect and highlight **echoes** of duplicated or near-duplicated code, so you can refactor toward cleaner, more maintainable designs.
 
@@ -55,7 +55,7 @@ python -m codeecho <path> [options]
 | `--output-dir <dir>` | `<cwd>/reports` | Directory where output file(s) will be written. |
 | `--db-dir <dir>` | `~/.codeecho` | Directory for the SQLite scratch database (`codeecho.db`). Session records are removed after the report is written. |
 | `--format <fmt>` | `both` | Output format: `json`, `html`, or `both`. |
-| `--min-tokens <n>` | `10` | Minimum token count for a code fragment to be included. |
+| `--min-tokens <n>` | `10` | Minimum line count for a code fragment to be included. |
 | `--exclude <pattern>` | _(none)_ | Glob pattern(s) to exclude from scanning (repeatable). |
 | `--target-list` | `false` | Treat `PATH` as a single existing file listing target paths (files and/or directories), one per line, instead of individual `PATH` arguments. Blank lines and lines starting with `#` are skipped. |
 | `--basis <file>` | _(none)_ | File listing basis target paths, one per line — same format as `--target-list`. Absolute file/directory entries are merged into the scan automatically and matched exactly; relative entries (e.g. a bare filename like `Foo.gs`) are matched by filename/suffix against any file discovered in the scan. The report is filtered to only clone groups touching at least one basis file, and groups duplicated purely among basis files are flagged (`basis_internal` in JSON, a "Basis-to-Basis" badge in HTML). |

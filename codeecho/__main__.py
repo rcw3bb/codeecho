@@ -237,7 +237,7 @@ def _discover_files(
     default=10,
     show_default=True,
     type=click.IntRange(1),
-    help="Minimum token count for a fragment to be considered.",
+    help="Minimum line count for a fragment to be considered.",
 )
 @click.option(
     "--exclude",
