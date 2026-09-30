@@ -91,7 +91,7 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
     :param file_path: Absolute path of the source file.
     :param language_name: Language name (e.g. ``"Python"``).
     :param session_id: UUID of the current scan session.
-    :param min_tokens: Fragments with fewer raw tokens are discarded.
+    :param min_tokens: Fragments spanning fewer lines than this are discarded.
     :returns: List of fully-populated :class:`Fragment` objects.
     :since: 1.0.0
     """
@@ -118,14 +118,14 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
         ]
         del cursor, captures  # free tree-sitter objects before processing
         for start_b, end_b in node_ranges:
+            start_ln = bisect_left(newline_offsets, start_b) + 1
+            end_ln = bisect_left(newline_offsets, end_b) + 1
+            if end_ln - start_ln + 1 < min_tokens:
+                continue
             src_text = source_bytes[start_b:end_b].decode("utf-8", errors="replace")
             raw_tokens, norm_tokens = normalizer.tokenise_and_normalise(
                 src_text, language_name
             )
-            if len(raw_tokens) < min_tokens:
-                continue
-            start_ln = bisect_left(newline_offsets, start_b) + 1
-            end_ln = bisect_left(newline_offsets, end_b) + 1
             fragments.append(
                 Fragment(
                     fragment_id=str(uuid.uuid4()),

@@ -12,7 +12,10 @@ from codeecho.parser import parse
 
 
 def test_extract_python_functions():
-    src = b"def foo(x):\n    return x + 1\n\ndef bar(y):\n    return y * 2\n"
+    src = (
+        b"def foo(x):\n    y = x + 1\n    z = y * 2\n    return z\n\n"
+        b"def bar(y):\n    a = y + 1\n    b = a * 2\n    return b\n"
+    )
     tree = parse(src, "Python")
     assert tree is not None
     frags = extract_fragments(
@@ -26,7 +29,7 @@ def test_extract_python_functions():
 
 
 def test_extract_python_class():
-    src = b"class Greeter:\n    def hello(self):\n        return 'hi'\n"
+    src = b"class Greeter:\n    def hello(self):\n        greeting = 'hi'\n        return greeting\n"
     tree = parse(src, "Python")
     assert tree is not None
     frags = extract_fragments(
@@ -38,19 +41,32 @@ def test_extract_python_class():
 
 
 def test_extract_min_tokens_filter():
-    src = b"def tiny():\n    pass\n"
+    src = b"def small():\n    x = 1\n    return x\n"
     tree = parse(src, "Python")
     assert tree is not None
-    # With a high min_tokens threshold, the tiny function should be excluded
+    # With a min_tokens threshold higher than the function's line count, it should be excluded
     frags = extract_fragments(
-        tree, src, Path("test.py"), "Python", "sess-1", min_tokens=100
+        tree, src, Path("test.py"), "Python", "sess-1", min_tokens=10
     )
     func_frags = [f for f in frags if f.fragment_type == "function"]
     assert len(func_frags) == 0
 
 
+def test_extract_default_min_tokens_excludes_tiny_fragment():
+    """Fragments spanning fewer lines than the default min_tokens are discarded."""
+    src = b"def tiny():\n    return 1\n"
+    tree = parse(src, "Python")
+    assert tree is not None
+    frags = extract_fragments(tree, src, Path("test.py"), "Python", "sess-1")
+    func_frags = [f for f in frags if f.fragment_type == "function"]
+    assert len(func_frags) == 0
+
+
 def test_extract_fragment_line_numbers():
-    src = b"x = 1\n\ndef greet(name):\n    return name\n"
+    src = (
+        b"x = 1\n\ndef greet(name):\n    prefix = 'hi'\n"
+        b"    greeting = f'{prefix} {name}'\n    return greeting\n"
+    )
     tree = parse(src, "Python")
     assert tree is not None
     frags = extract_fragments(
@@ -63,19 +79,23 @@ def test_extract_fragment_line_numbers():
 
 def test_extract_hashes_not_set():
     """Extractor does not set hashes; fingerprint module is responsible."""
-    src = b"def foo():\n    pass\n"
+    src = b"def foo():\n    x = 1\n    y = 2\n    return x + y\n"
     tree = parse(src, "Python")
     assert tree is not None
     frags = extract_fragments(
         tree, src, Path("test.py"), "Python", "sess-1", min_tokens=1
     )
+    assert frags
     for frag in frags:
         assert frag.raw_hash is None
         assert frag.normalized_hash is None
 
 
 def test_extract_java_method():
-    src = b"class Foo { public int add(int a, int b) { return a + b; } }"
+    src = (
+        b"class Foo {\n    public int add(int a, int b) {\n"
+        b"        int sum = a + b;\n        return sum;\n    }\n}\n"
+    )
     tree = parse(src, "Java")
     assert tree is not None
     frags = extract_fragments(

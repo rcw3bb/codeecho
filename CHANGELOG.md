@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.3 - 2026-10-01
+
+### Changed
+
+- `--min-tokens` (default `10`, unchanged) now measures a fragment's **line count** instead of its
+  raw token count: a fragment must span at least this many lines to be considered. Annotations,
+  braces, and semicolons could previously inflate a trivial one-line getter/override's token count
+  enough to slip past `--min-tokens` and surface as a noisy Type-1 clone group; line count is a
+  more reliable measure of fragment size.
+
 ## 1.2.2 - 2026-09-23
 
 ### Changed
