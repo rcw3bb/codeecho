@@ -57,6 +57,7 @@ _QUERIES: dict[tuple[str, str], str] = {
 # NOTE: Query objects are NOT cached — tree-sitter 0.26 Query instances carry internal
 # cursor state that becomes stale when reused across different Tree objects.
 _FRAGMENT_TYPES: tuple[str, ...] = ("function", "class", "file")
+_CODE_BLOCK_TYPES: tuple[str, ...] = tuple(t for t in _FRAGMENT_TYPES if t != "file")
 
 
 def _get_query(language_name: str, fragment_type: str, lang: Language) -> Query | None:
@@ -83,6 +84,7 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
     language_name: str,
     session_id: str,
     min_tokens: int = 10,
+    code_blocks_only: bool = False,
 ) -> list[Fragment]:
     """Extract all fragment types from *tree* and return a list of populated :class:`Fragment` objects.
 
@@ -92,6 +94,8 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
     :param language_name: Language name (e.g. ``"Python"``).
     :param session_id: UUID of the current scan session.
     :param min_tokens: Fragments spanning fewer lines than this are discarded.
+    :param code_blocks_only: When ``True``, only ``function`` and ``class`` fragments are extracted;
+        whole-file fragments are skipped.
     :returns: List of fully-populated :class:`Fragment` objects.
     :since: 1.0.0
     """
@@ -104,7 +108,7 @@ def extract_fragments(  # pylint: disable=too-many-arguments,too-many-positional
     newline_offsets: list[int] = [
         i for i, b in enumerate(source_bytes) if b == ord(b"\n")
     ]
-    for ftype in _FRAGMENT_TYPES:
+    for ftype in _CODE_BLOCK_TYPES if code_blocks_only else _FRAGMENT_TYPES:
         query = _get_query(language_name, ftype, lang)
         if query is None:
             continue

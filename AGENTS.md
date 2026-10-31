@@ -6,7 +6,7 @@
 
 - codeecho/ — main package source code
 - codeecho/__init__.py — package entry point; bootstraps config dir and logger
-- codeecho/__main__.py — Click CLI entry point (--version, --types, --threshold, --output, --format, --min-tokens, --exclude, --target-list); Rich progress bar and summary table
+- codeecho/__main__.py — Click CLI entry point (--version, --types, --threshold, --output, --format, --min-tokens, --exclude, --target-list, --code-blocks-only); Rich progress bar and summary table
 - codeecho/config.py — Config class reading config.ini `[override] ignore-file` (falls back to `.ignore`)
 - codeecho/models.py — Fragment, CloneGroup, ScanResult dataclasses
 - codeecho/db.py — SessionDB context manager; SQLite session store (schema, CRUD, cascade delete)

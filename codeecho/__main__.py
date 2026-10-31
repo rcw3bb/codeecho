@@ -272,6 +272,16 @@ def _discover_files(
         "are flagged as such."
     ),
 )
+@click.option(
+    "--code-blocks-only",
+    "code_blocks_only",
+    is_flag=True,
+    default=False,
+    help=(
+        "Only process code blocks (functions and classes); whole-file "
+        "fragments are not extracted or checked for duplicates."
+    ),
+)
 def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,invalid-name
     paths: tuple[Path, ...],
     types: str,
@@ -284,6 +294,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
     exclude: tuple[str, ...],
     target_list: bool,
     basis_path: Path | None,
+    code_blocks_only: bool,
 ) -> None:
     """Scan one or more PATH(s) for duplicate and near-duplicate code.
 
@@ -314,6 +325,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
         "min_tokens": min_tokens,
         "exclude": list(exclude),
         "basis": [str(p) for p in basis_targets],
+        "code_blocks_only": code_blocks_only,
     }
     resolved = [p.resolve() for p in paths]
     for target in basis_targets:
@@ -341,7 +353,9 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
                     "[yellow]Warning: none of the --basis paths matched any scanned files.[/yellow]"
                 )
 
-        total_fragments = _process_files(files, session_db, session_id, min_tokens)
+        total_fragments = _process_files(
+            files, session_db, session_id, min_tokens, code_blocks_only
+        )
 
         cnt1, cnt2, cnt3 = _detect_clones(
             session_db, session_id, detect_types, threshold
@@ -464,8 +478,11 @@ def _process_files(
     session_db: SessionDB,
     session_id: str,
     min_tokens: int,
+    code_blocks_only: bool = False,
 ) -> int:
     """Parse, extract, and hash every file; bulk-insert fragments into *session_db*.
+
+    When *code_blocks_only* is ``True``, whole-file fragments are not extracted.
 
     Returns:
         Total number of fragments extracted.
@@ -488,7 +505,13 @@ def _process_files(
                 tree = ts_parser.parse(source_bytes, language)
                 if tree is not None:
                     frags = extractor.extract_fragments(
-                        tree, source_bytes, file_path, language, session_id, min_tokens
+                        tree,
+                        source_bytes,
+                        file_path,
+                        language,
+                        session_id,
+                        min_tokens,
+                        code_blocks_only,
                     )
                     fingerprint.hash_all(frags)
                     session_db.insert_many_fragments(frags)

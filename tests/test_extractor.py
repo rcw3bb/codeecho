@@ -62,6 +62,26 @@ def test_extract_default_min_tokens_excludes_tiny_fragment():
     assert len(func_frags) == 0
 
 
+def test_extract_code_blocks_only_skips_file_fragments():
+    src = b"class Greeter:\n    def hello(self):\n        greeting = 'hi'\n        return greeting\n"
+    tree = parse(src, "Python")
+    assert tree is not None
+    default = extract_fragments(
+        tree, src, Path("test.py"), "Python", "sess-1", min_tokens=1
+    )
+    assert {f.fragment_type for f in default} == {"function", "class", "file"}
+    blocks = extract_fragments(
+        tree,
+        src,
+        Path("test.py"),
+        "Python",
+        "sess-1",
+        min_tokens=1,
+        code_blocks_only=True,
+    )
+    assert {f.fragment_type for f in blocks} == {"function", "class"}
+
+
 def test_extract_fragment_line_numbers():
     src = (
         b"x = 1\n\ndef greet(name):\n    prefix = 'hi'\n"

@@ -317,6 +317,44 @@ def test_basis_files_passed_to_report_writers(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# --code-blocks-only option
+# ---------------------------------------------------------------------------
+
+
+def _run_and_capture_fragment_types(tmp_path, extra_args):
+    """Invoke the CLI on a small Python file and return the extracted fragment types."""
+    src = tmp_path / "a.py"
+    body = "".join(f"    x{i} = {i}\n" for i in range(12))
+    src.write_text(f"def foo():\n{body}    return x0\n", encoding="utf-8")
+    captured: list[str] = []
+
+    def fake_detect(session_db, session_id, *_args):
+        captured.extend(f.fragment_type for f in session_db.get_fragments(session_id))
+        return 0, 0, 0
+
+    with patch("codeecho.__main__.detect", side_effect=fake_detect):
+        result = CliRunner().invoke(
+            main,
+            [str(src), "--db-dir", str(tmp_path / "db"), "--format", "json"]
+            + extra_args,
+        )
+    assert result.exit_code == 0, result.output
+    return set(captured)
+
+
+def test_code_blocks_only_skips_file_fragments(tmp_path):
+    """--code-blocks-only extracts functions/classes but no whole-file fragments."""
+    types = _run_and_capture_fragment_types(tmp_path, ["--code-blocks-only"])
+    assert types == {"function"}
+
+
+def test_default_includes_file_fragments(tmp_path):
+    """Without --code-blocks-only, whole-file fragments are still extracted."""
+    types = _run_and_capture_fragment_types(tmp_path, [])
+    assert types == {"function", "file"}
+
+
+# ---------------------------------------------------------------------------
 # _load_ignore_file / _build_ignore (config.ini override support)
 # ---------------------------------------------------------------------------
 
