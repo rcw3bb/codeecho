@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 - 2026-10-31
+
+### Added
+
+- `--code-blocks-only` flag: only code blocks (functions and classes) are extracted and compared for
+  duplicates; whole-file fragments are skipped.
+
 ## 1.2.3 - 2026-10-01
 
 ### Changed
